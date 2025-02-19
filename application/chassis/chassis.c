@@ -184,8 +184,8 @@ void ChassisTask()
             // if(flag_3508 == 0 && F_data_1 >=des){
             //     flag_3508 = 1;
             // }
-            DJIMotorSetRef(motor_lf, );
-            DJIMotorSetRef(motor_rf, );
+            DJIMotorSetRef(motor_lf, 0);
+            DJIMotorSetRef(motor_rf, 0);
             break;
         default:
             break;

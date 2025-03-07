@@ -271,13 +271,13 @@ static void RemoteControlSet()
         gimbal_cmd_send.yaw += 0.001f * (float)rc_data[TEMP].rc.rocker_l_;
         gimbal_cmd_send.bottom += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
 
-        if(gimbal_cmd_send.yaw>30)
+        if(gimbal_cmd_send.yaw>50)
         {
-            gimbal_cmd_send.yaw=30;
+            gimbal_cmd_send.yaw=50;
         }
-        else if (gimbal_cmd_send.yaw<-30)
+        else if (gimbal_cmd_send.yaw<-50)
         {
-            gimbal_cmd_send.yaw=-30;
+            gimbal_cmd_send.yaw=-50;
         }
 
         if(gimbal_cmd_send.bottom>30)
@@ -451,7 +451,7 @@ void Change_bottom_position(int num)
             yaw_control_servo = -67 + 180;  
             break;
         case 5:
-            yaw_control_servo = -118 + 180;
+            yaw_control_servo = -119 + 180;
         default:
             break;
     }
@@ -465,7 +465,7 @@ void arm_up_claw_open()
     DWT_Delay(0.5);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0000!", 16);    
     DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1250T0100!", 16);
     DWT_Delay(0.5);
 }
 
@@ -473,7 +473,7 @@ void claw_open_arm_up()
 {
     ServoSetAngle(arm_motor,0.105);
     DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1250T0100!", 16);
     DWT_Delay(0.5);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0100!", 16);
     DWT_Delay(0.5);
@@ -493,9 +493,9 @@ void arm_up_claw_close()
 
 void arm_down_claw_open_1()
 {
-    ServoSetAngle(arm_motor,0.082);     //
+    ServoSetAngle(arm_motor,0.0822);     //
     DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1350T0100!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1370T0100!", 16);
     DWT_Delay(0.5);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
     DWT_Delay(0.5);
@@ -504,11 +504,11 @@ void arm_down_claw_open_1()
 
 void arm_down_claw_close_1()
 {
-    ServoSetAngle(arm_motor,0.082);
+    ServoSetAngle(arm_motor,0.0822);
     DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1350T0100!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1370T0100!", 16);
     DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0920T0100!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
     DWT_Delay(0.5);
 
 }
@@ -517,7 +517,7 @@ void arm_down_claw_open_2()
 {
     ServoSetAngle(arm_motor,0.084);
     DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1350T0100!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
     DWT_Delay(0.5);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
     DWT_Delay(0.5);
@@ -528,18 +528,18 @@ void arm_down_claw_close_2()
 {
     ServoSetAngle(arm_motor,0.084);
     DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1350T0100!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
     DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0920T0100!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
     DWT_Delay(0.5);
 
 }
 
 void arm_down_claw_open_3()
 {
-    ServoSetAngle(arm_motor,0.0823);
+    ServoSetAngle(arm_motor,0.082);
     DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1420T0100!!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!!", 16);
     DWT_Delay(0.5);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
     DWT_Delay(0.5);
@@ -548,9 +548,9 @@ void arm_down_claw_open_3()
 
 void arm_down_claw_close_3()
 {
-    ServoSetAngle(arm_motor,0.0823);
+    ServoSetAngle(arm_motor,0.082);
     DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1420T0100!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
     DWT_Delay(0.5);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
     DWT_Delay(0.5);
@@ -596,7 +596,7 @@ void arm_put_claw_close_1()
     DWT_Delay(0.5);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
     DWT_Delay(0.5); 
-    ServoSetAngle(arm_motor,0.065);
+    ServoSetAngle(arm_motor,0.064);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
     DWT_Delay(0.5);
 
@@ -606,7 +606,7 @@ void arm_put_claw_open_2()
 {
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
     DWT_Delay(0.5);
-    ServoSetAngle(arm_motor,0.065);
+    ServoSetAngle(arm_motor,0.063);
     DWT_Delay(0.5);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
     DWT_Delay(0.5);
@@ -615,11 +615,11 @@ void arm_put_claw_open_2()
 
 void arm_put_claw_close_2()
 {
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0800T0150!", 16);
+    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0780T0150!", 16);
     DWT_Delay(0.5);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
     DWT_Delay(0.5); 
-    ServoSetAngle(arm_motor,0.064);
+    ServoSetAngle(arm_motor,0.063);
     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
     DWT_Delay(0.5);
 

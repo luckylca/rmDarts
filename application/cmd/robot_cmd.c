@@ -217,7 +217,7 @@ static void RemoteControlSet()
             shoot_cmd_send.shoot_rate = 0;
 
         // shoot_cmd_send.shoot_rate += 0.1f * (float)rc_data[TEMP].rc.rocker_r_;    //参数  要改
-        chassis_cmd_send.v1 = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
+        chassis_cmd_send.v1 = 30.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
     }
     else if (switch_is_down(rc_data[TEMP].rc.switch_right)) // 
     {

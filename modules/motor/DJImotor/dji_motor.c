@@ -113,6 +113,31 @@ static void MotorSenderGrouping(DJIMotorInstance *motor, CAN_Init_Config_s *conf
     }
 }
 
+void DJIMotorFilterInit(DJI_Motor_Measure_s *measure)
+{
+    // 初始化滤波器缓存和索引
+    for (int i = 0; i < 200; i++) {
+        measure->current_filter_buffer[i] = 0.0f;
+    }
+    measure->filter_index = 0;
+    measure->filtered_current = 0.0f;
+}
+
+float DJIMotorCurrentFilter(DJI_Motor_Measure_s *measure, float new_value)
+{
+    // 更新缓存
+    measure->current_filter_buffer[measure->filter_index] = new_value;
+    measure->filter_index = (measure->filter_index + 1) % 200;
+
+    // 计算平均值
+    float sum = 0.0f;
+    for (int i = 0; i < 200; i++) {
+        sum += measure->current_filter_buffer[i];
+    }
+    measure->filtered_current = sum / 200.0f;
+    return measure->filtered_current;
+}
+
 /**
  * @todo  是否可以简化多圈角度的计算？
  * @brief 根据返回的can_instance对反馈报文进行解析
@@ -136,8 +161,11 @@ static void DecodeDJIMotor(CANInstance *_instance)
     measure->angle_single_round = ECD_ANGLE_COEF_DJI * (float)measure->ecd;
     measure->speed_aps = (1.0f - SPEED_SMOOTH_COEF) * measure->speed_aps +
                          RPM_2_ANGLE_PER_SEC * SPEED_SMOOTH_COEF * (float)((int16_t)(rxbuff[2] << 8 | rxbuff[3]));
-    measure->real_current = (1.0f - CURRENT_SMOOTH_COEF) * measure->real_current +
-                            CURRENT_SMOOTH_COEF * (float)((int16_t)(rxbuff[4] << 8 | rxbuff[5]));
+    
+    // 使用滑动均值滤波器处理电流值
+    float current_raw = (float)((int16_t)(rxbuff[4] << 8 | rxbuff[5]));
+    measure->real_current = DJIMotorCurrentFilter(measure, current_raw);
+    
     measure->temperature = rxbuff[6];
 
     // 多圈角度计算,前提是假设两次采样间电机转过的角度小于180°,自己画个图就清楚计算过程了
@@ -162,8 +190,11 @@ DJIMotorInstance *DJIMotorInit(Motor_Init_Config_s *config)
     memset(instance, 0, sizeof(DJIMotorInstance));
 
     // motor basic setting 电机基本设置
-    instance->motor_type = config->motor_type;                         // 6020 or 2006 or 3508
-    instance->motor_settings = config->controller_setting_init_config; // 正反转,闭环类型等
+    instance->motor_type = config->motor_type;
+    instance->motor_settings = config->controller_setting_init_config;
+
+    // 初始化滤波器
+    DJIMotorFilterInit(&instance->measure);
 
     // motor controller init 电机控制器初始化
     PIDInit(&instance->motor_controller.current_PID, &config->controller_param_init_config.current_PID);

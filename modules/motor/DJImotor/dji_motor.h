@@ -25,7 +25,7 @@
 
 /* 滤波系数设置为1的时候即关闭滤波 */
 #define SPEED_SMOOTH_COEF 0.85f      // 最好大于0.85
-#define CURRENT_SMOOTH_COEF 0.9f     // 必须大于0.9
+#define CURRENT_SMOOTH_COEF_DART 0.95f     // 必须大于0.9
 #define ECD_ANGLE_COEF_DJI 0.043945f // (360/8192),将编码器值转化为角度制
 
 /* DJI电机CAN反馈信息*/
@@ -41,6 +41,16 @@ typedef struct
 
     float total_angle;   // 总角度,注意方向
     int32_t total_round; // 总圈数,注意方向
+
+    // 滑动均值滤波器数据
+    float current_filter_buffer[200];  // 电流滤波缓存
+    uint8_t filter_index;             // 滤波器当前索引
+    float filtered_current;           // 滤波后的电流值
+    
+    // 编码器滤波器数据
+    uint16_t ecd_filter_buffer[200];  // 编码器值滤波缓存
+    uint8_t ecd_filter_index;         // 编码器滤波器当前索引
+    uint16_t filtered_ecd;            // 滤波后的编码器值
 } DJI_Motor_Measure_s;
 
 /**
@@ -127,5 +137,19 @@ void DJIMotorEnable(DJIMotorInstance *motor);
  * @param outer_loop 外层闭环类型
  */
 void DJIMotorOuterLoop(DJIMotorInstance *motor, Closeloop_Type_e outer_loop);
+
+/**
+ * @brief 初始化电机测量值的滑动均值滤波器
+ * @param measure 电机测量值结构体指针
+ */
+void DJIMotorFilterInit(DJI_Motor_Measure_s *measure);
+
+/**
+ * @brief 使用滑动均值滤波器处理电流值
+ * @param measure 电机测量值结构体指针
+ * @param new_value 新的电流值
+ * @return 滤波后的电流值
+ */
+float DJIMotorCurrentFilter(DJI_Motor_Measure_s *measure, float new_value);
 
 #endif // !DJI_MOTOR_H

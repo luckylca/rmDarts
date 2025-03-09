@@ -18,7 +18,6 @@ static Shoot_Upload_Data_s shoot_feedback_data; // 来自cmd的发射控制信�
 // dwt定时,计算冷却用
 static float hibernate_time = 0, dead_time = 10;
 
-extern float flag_servo;
 float rate = 20000;  //转动速度
 int last_goal = 0;  //上次目标
 extern int goal;
@@ -107,7 +106,7 @@ void ShootTask()
         case BANJI_ON:
             ServoSetAngle(banji_motor,0.076);
             // ServoSetAngle(banji_motor,0.074);
-            // flag_3508 == 0;
+            flag_3508 = 0;
             break;
         default:
             break;        

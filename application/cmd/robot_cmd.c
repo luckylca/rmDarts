@@ -88,7 +88,7 @@ static int time = 0;
 static int last_time=RC_SW_DOWN;
 int yaw_control_servo = -118 + 180;
 
-float flag_servo=0;
+int flag_servo=0;
 int goal = 0;
 extern int flag_3508;
 
@@ -753,8 +753,8 @@ void arm_task_44()
 void uart1Task()
 {
     // RemoteControl_outline_ALARM();
-//    if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP && flag_3508 == 1 && flag_servo == 0)// 左 侧开关状态[上],
-   if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP)// 左 侧开关状态[上],
+if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP && flag_3508 == 1 && flag_servo == 0)// 左 侧开关状态[上],
+//    if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP)// 左 侧开关状态[上],
     {
          switch (time)
         {
@@ -785,7 +785,7 @@ void uart1Task()
             default:
                 break;
         }
-        // flag_servo = 1;
+        flag_servo = 1;
     }
     last_time=rc_data[TEMP].rc.switch_left;
 

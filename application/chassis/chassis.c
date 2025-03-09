@@ -47,6 +47,9 @@ static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据�
                               
 static DJIMotorInstance *motor_lf, *motor_rf; // left right forward back
 
+static float original_angle = 0;
+int read_original_angle = 1;
+
 static float dt = 0;
 /* 用于自旋变速策略的时间变量 */
 // static float t;
@@ -58,12 +61,14 @@ static float vt_lf, vt_rf, vt_lb, vt_rb; // 底盘速度解算后的临时输出
 extern double F_data_1;
 int flag_3508 = 0; // 发射后重拉
 extern int flag_servo ; // 设定目标后将3508复位
-float des = 20; //固定位置力大小
+int shooted_flag = 0;
+
+float des = 40; //固定位置力大小
 float load_dart_force = 0; // 通过装载飞镖的力的大小来确定位置
 float shoot_16m_force = 0; // 打击16m距离所需要的力
 float shoot_25m_force = 0; // 打击25m距离所需要的力
 
-float v = -1000;  //转动速度
+float v = -5000;  //转动速度
 
 void ChassisInit()
 {
@@ -150,6 +155,11 @@ void ChassisTask()
     }
     else
     { // 正常工作
+        if(read_original_angle==1)
+        {
+            original_angle = motor_lf->measure.total_angle;
+            read_original_angle = 0;
+        }
         DJIMotorEnable(motor_lf);
         DJIMotorEnable(motor_rf);
     }
@@ -163,29 +173,37 @@ void ChassisTask()
             break;
         case AUTO_MODE: 
         
-            // if(flag_3508==0 && F_data_1 <= des)
-            // {
-            //     DJIMotorSetRef(motor_lf, v);
-            //     DJIMotorSetRef(motor_rf, v);
-            // }
-            // else if(flag_servo == 1 && F_data_1 >= 2)
-            // {
-            //     DJIMotorSetRef(motor_lf, -v);
-            //     DJIMotorSetRef(motor_rf, -v);
-            // }        
-            // else
-            // {
-            //     DJIMotorSetRef(motor_lf, 0);
-            //     DJIMotorSetRef(motor_rf, 0);
-            // }
-            // if(flag_servo == 1 && F_data_1 <=2){
-            //     flag_servo = 0;
-            // }
-            // if(flag_3508 == 0 && F_data_1 >=des){
-            //     flag_3508 = 1;
-            // }
-            DJIMotorSetRef(motor_lf, 0);
-            DJIMotorSetRef(motor_rf, 0);
+            if((flag_3508==0||flag_servo==0) && F_data_1 <= des)
+            {
+                DJIMotorSetRef(motor_lf, v);
+                DJIMotorSetRef(motor_rf, v);
+            }
+            else if(flag_servo == 1)
+            {
+                float see = motor_lf->measure.total_angle - original_angle;
+
+                if(see > 0)
+                {
+                    DJIMotorSetRef(motor_lf, -v);
+                    DJIMotorSetRef(motor_rf, -v);
+                }
+
+            }        
+            else
+            {
+                DJIMotorSetRef(motor_lf, 0);
+                DJIMotorSetRef(motor_rf, 0);
+            }
+
+            if(flag_servo == 1 && F_data_1 <0 && shooted_flag == 1)
+            {
+                flag_servo = 0;
+            }
+            if(flag_3508 == 0 && F_data_1 >=des)
+            {
+                flag_3508 = 1;
+            }
+
             break;
         default:
             break;

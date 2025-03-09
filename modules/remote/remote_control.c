@@ -26,7 +26,7 @@ static DaemonInstance *rc_daemon_instance;
 // 拉力传感器用的串口实例
 static USARTInstance *F_usart_instance;
 static DaemonInstance *F_daemon_instance;
-
+extern uint8_t rs485buf[5];
 /**
  * @brief 矫正遥控器摇杆的值,超过660或者小于-660的值都认为是无效值,置0
  *
@@ -293,6 +293,7 @@ static void F_RxCallback()
 static void FLostCallback(void *id)
 {
     F_data_1 = 0; // 清空拉力传感器数据
+    HAL_UART_Transmit(&huart6, rs485buf, 5, 1000);
     USARTServiceInit(F_usart_instance); // 尝试重新启动接收
     LOGWARNING("[F] remote control lost");
 }
@@ -307,7 +308,7 @@ double* F_Init(UART_HandleTypeDef *F_usart_handle)
 
     // 进行守护进程的注册,用于定时检查遥控器是否正常工作
     Daemon_Init_Config_s F_daemon_conf = {
-        .reload_count = 10, // 100ms未收到数据视为离线,遥控器的接收频率实际上是1000/14Hz(大约70Hz)
+        .reload_count = 200, // 100ms未收到数据视为离线,遥控器的接收频率实际上是1000/14Hz(大约70Hz)
     //  .callback = RCLostCallback,
         .callback = FLostCallback,
         .owner_id = (void *)F_usart_handle, // 只有1个遥控器,不需要owner_id

@@ -65,6 +65,7 @@ int shooted_flag = 0;
 int flag_delay = 0; 
 int flag_back = 0;
 int flag_set = 0;
+//放镖完毕标志位
 int flag_pause = 0;
 extern int flag_2006;
 
@@ -177,40 +178,53 @@ void ChassisTask()
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
             break;
         case AUTO_MODE: 
-        
-            if((flag_3508==0||flag_servo==0) && F_data_1 <= des)
+            // 当3508还没有到位，并且拉力小于目标拉力时
+            if(flag_3508==0||flag_servo==0)
             {
-                if(flag_pause == 0){
+                // 等待
+                if(flag_pause == 0)
+                {
                     DWT_Delay(2);
+                    
                     flag_pause = 1;
                 } 
-                if(flag_set == 0 && F_data_1 >=des){
-                    flag_set == 1;
-                    DJIMotorSetRef(motor_lf, -v);
-                    DJIMotorSetRef(motor_rf, -v);
-                }
-                if(flag_set == 0){
+
+                // if(flag_set == 0 && F_data_1 ==des)
+                // {
+                //     // 到达目标位置
+                //     flag_set == 1;
+                // }
+
+                if(F_data_1 <= des)
+                {
                     DJIMotorSetRef(motor_lf, v);
                     DJIMotorSetRef(motor_rf, v);
                 }
-                else{
+                else
+                {
                     DJIMotorSetRef(motor_lf, -v);
                     DJIMotorSetRef(motor_rf, -v);                   
                 }
 
                 flag_back = 0;
             }
+
             else if(flag_servo == 1)
-            {
-                if(flag_delay == 0){
+            {   
+                // 放镖延时
+                if(flag_delay == 0)
+                {
                     DWT_Delay(5);
                     flag_delay=1;
                 }
+
+                // 2006还没到位，且拉力小于85
                 if(flag_2006 == 0 && F_data_1 <= 85)
                 {
                     DJIMotorSetRef(motor_lf, v);
                     DJIMotorSetRef(motor_rf, v);
                 }
+                // 如果2006到位，电机回到原位准备发射
                 if(flag_2006 == 1)
                 {
                     float see = motor_lf->measure.total_angle - original_angle;
@@ -220,9 +234,11 @@ void ChassisTask()
                         DJIMotorSetRef(motor_lf, -v);
                         DJIMotorSetRef(motor_rf, -v);
                     }
-                    else{
+                    else
+                    {
                         DJIMotorSetRef(motor_lf, 0);
                         DJIMotorSetRef(motor_rf, 0);
+                        // 3508归位标志位
                         flag_back = 1;
                     }   
                 }

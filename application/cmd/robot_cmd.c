@@ -89,7 +89,7 @@ static int last_time=RC_SW_DOWN;
 int yaw_control_servo = -118 + 180;
 
 int flag_servo=0;
-int goal = 0;
+goal_of_dart goal = ANGLE_16M;
 extern int flag_3508;
 
 int last_val = 0;
@@ -204,6 +204,7 @@ static void RemoteControlSet()
     {
         chassis_cmd_send.chassis_mode = OPEN_3508;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
+        shoot_cmd_send.load_mode = LOAD_NORMAL;
         goal=0;
         if(rc_data[TEMP].rc.rocker_r_>200)
         { 
@@ -225,11 +226,13 @@ static void RemoteControlSet()
         gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
         shoot_cmd_send.banji_mode = BANJI_OFF;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
+        shoot_cmd_send.load_mode = LOAD_STOP;
     }
     else if (switch_is_up(rc_data[TEMP].rc.switch_right))
     {
         chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
+        shoot_cmd_send.load_mode = AUTO_LOAD;
         goal=1;
         if(rc_data[TEMP].rc.rocker_r_>200)
         { 
@@ -252,16 +255,18 @@ static void RemoteControlSet()
     // 拨轮打开发射
     if (rc_data[TEMP].rc.dial > 0 )
     {
-        shoot_cmd_send.banji_mode = BANJI_ON;
-        // last_val = rc_data[TEMP].rc.dial;
-        
+        if(switch_is_up(rc_data[TEMP].rc.switch_right))
+        {
+            shoot_cmd_send.banji_mode = BANJI_ON_AUTO;
+        }
+        else
+            shoot_cmd_send.banji_mode = BANJI_ON;
     }
     else
     {
-            // 默认锁定
+        // 默认锁定
         shoot_cmd_send.banji_mode = BANJI_OFF;
-        // last_val = rc_data[TEMP].rc.dial;
-    
+       
     }
 
     // 云台参数,确定云台控制数据
@@ -288,15 +293,7 @@ static void RemoteControlSet()
         {
             gimbal_cmd_send.bottom=-30;
         }
-        
-        shoot_cmd_send.load_mode = LOAD_NORMAL;
-        
-        // if(gimbal_cmd_send.bottom>30){
-        //     gimbal_cmd_send.bottom=30;
-        // }
-        // else if (gimbal_cmd_send.bottom<-30){
-        //     gimbal_cmd_send.bottom=-30;
-        // }
+
     }
 
     else if (switch_is_down(rc_data[TEMP].rc.switch_left))// || vision_recv_data->target_state == NO_TARGET
@@ -312,7 +309,6 @@ static void RemoteControlSet()
     // 发射参数
     else if (switch_is_up(rc_data[TEMP].rc.switch_left)) // 左 侧开关状态[上],
     {
-        // shoot_cmd_send.load_mode = LOAD_NORMAL;
          gimbal_cmd_send.gimbal_mode = TWO_YAW;
         gimbal_cmd_send.yaw += 0.001f * (float)rc_data[TEMP].rc.rocker_l_;
         gimbal_cmd_send.bottom += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
@@ -335,7 +331,7 @@ static void RemoteControlSet()
             gimbal_cmd_send.bottom=-30;
         }
         
-        shoot_cmd_send.load_mode = LOAD_NORMAL;
+       
         
         // gimbal_cmd_send.gimbal_mode = AUTO_DART;
     }                                       

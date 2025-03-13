@@ -105,12 +105,14 @@ typedef enum
 typedef enum
 {
     SHOOT_OFF = 0,
-    SHOOT_ON,
+    SHOOT_ON
+    
 } shoot_mode_e;
 typedef enum
 {
     BANJI_OFF = 0, // 摩擦轮关闭
     BANJI_ON,      // 摩擦轮开启
+    BANJI_ON_AUTO
 } banji_mode_e;
 typedef enum
 {
@@ -129,8 +131,16 @@ typedef enum
     LOAD_STOP = 0,  // 停止发射
     LOAD_REVERSE,   // 反转
     LOAD_NORMAL,  // zheng
+    AUTO_LOAD
 } loader_mode_e;
 
+
+typedef enum
+{
+    ANGLE_16M = 0,
+    ANGLE_25M,
+    ANGLE_SHOOT
+} goal_of_dart;
 // 功率限制,从裁判系统获取,是否有必要保留?
 typedef struct
 { // 功率控制

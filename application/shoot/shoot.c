@@ -23,6 +23,7 @@ float dead_angle = 2000;
 extern RC_ctrl_t *rc_data;
 
 int flag_2006 = 0;
+int read_2006_angle = 1;
 float rate = 20000;  //转动速度
 int last_goal = 0;  //上次目标
 extern int goal;
@@ -32,6 +33,9 @@ extern int flag_delay;
 extern int flag_set;
 extern int flag_pause;
 extern int flag_back;
+
+angle_16m = 0; //目标
+angle_25m = 0;
 
 
 void ShootInit()
@@ -99,7 +103,12 @@ void ShootTask()
 {
     // 从cmd获取控制数据
     SubGetMessage(shoot_sub, &shoot_cmd_recv);
-
+    // 初始化丝杆角度
+    if(read_2006_angle==1)
+    {
+        loader_origin_angle = loader->measure.total_angle;
+        read_2006_angle = 0;
+    }
     // 对shoot mode等于SHOOT_STOP的情况特殊处理,直接停止所有电机(紧急停止)
     if (shoot_cmd_recv.shoot_mode == SHOOT_OFF)
     {
@@ -108,33 +117,37 @@ void ShootTask()
     }
     else // 恢复运行
     {   
-         // 扳机的控制
+        // 扳机的控制
         switch(shoot_cmd_recv.banji_mode)
         {
-        case BANJI_OFF:
-            ServoSetAngle(banji_motor,0.063);
-            break;
-        case BANJI_ON:
-            if(flag_servo == 0){
-                ServoSetAngle(banji_motor,0.070);
-            }
-            else if(flag_2006 == 1){
-                ServoSetAngle(banji_motor,0.076);
-            }
-            
-            // ServoSetAngle(banji_motor,0.074);
-            if(flag_back == 1){
-                flag_servo = 0;
-                flag_delay = 0;
-                flag_3508 = 0;
-                flag_set = 0;
-                flag_pause = 0;  
-                flag_2006 = 0;              
-            }
+            case BANJI_OFF:
+                ServoSetAngle(banji_motor,0.063);
+                break;
+            case BANJI_ON:
+                ServoSetAngle(banji_motor,0.074);
+            case BANJI_ON_AUTO:
+                if(flag_servo == 0)
+                {
+                    ServoSetAngle(banji_motor,0.070);
+                }
+                else if(flag_2006 == 1)
+                {
+                    ServoSetAngle(banji_motor,0.076);
+                }
+                
+                if(flag_back == 1)
+                {
+                    flag_servo = 0;
+                    flag_delay = 0;
+                    flag_3508 = 0;
+                    flag_set = 0;
+                    flag_pause = 0;  
+                    flag_2006 = 0;              
+                }
 
-            break;
-        default:
-            break;        
+                break;
+            default:
+                break;        
         }
         DJIMotorEnable(loader);
     }
@@ -147,45 +160,64 @@ void ShootTask()
         DJIMotorOuterLoop(loader, SPEED_LOOP); // 切换到速度环
         DJIMotorSetRef(loader, 0);             // 同时设定参考值为0,这样停止的速度最快
         break;
+    case AUTO_LOAD:
+        DJIMotorOuterLoop(loader, SPEED_LOOP);
+        if(flag_servo == 1)
+        {
+            switch(goal)
+            {
+                case ANGLE_16M:
+                    rate = 20000;
+                    if ((loader->measure.total_angle - loader_origin_angle)- angle_16m <= -20)
+                    {
+                        DJIMotorSetRef(loader, rate);   
+                    }
+                    else if((loader->measure.total_angle - loader_origin_angle) - angle_16m >= 20)
+                    {
+                        DJIMotorSetRef(loader, -rate);
+                    }
+                    else
+                        DJIMotorSetRef(loader, 0);
+                        flag_2006 = 1;                
+                    break;
+                case ANGLE_25M:
+                    rate = 20000;
+                    if ((loader->measure.total_angle - loader_origin_angle)- angle_25m <= -20)
+                    {
+                        DJIMotorSetRef(loader, rate);   
+                    }
+                    else if((loader->measure.total_angle - loader_origin_angle) - angle_25m >= 20)
+                    {
+                        DJIMotorSetRef(loader, -rate);
+                    }
+                    else
+                        DJIMotorSetRef(loader, 0);
+                        flag_2006 = 1;                
+                    break;
+                case ANGLE_SHOOT:
+                    rate = 20000;
+                    if ((loader->measure.total_angle - loader_origin_angle)<= -20)
+                    {
+                        DJIMotorSetRef(loader, rate);   
+                    }
+                    else if((loader->measure.total_angle - loader_origin_angle)>= 20)
+                    {
+                        DJIMotorSetRef(loader, -rate);
+                    }
+                    else
+                        DJIMotorSetRef(loader, 0);
+                        flag_2006 = 1;                
+                    break;
+                default:
+                    break;
+            }
+        }
+        else
+            DJIMotorSetRef(loader, 0);
+
     case LOAD_NORMAL:
         DJIMotorOuterLoop(loader, SPEED_LOOP);
-        if(flag_servo == 1){
-            if(last_goal == 0 && goal == 1)
-            {
-                rate = 20000;
-                loader_origin_angle = loader->measure.total_angle;
-                if ((loader->measure.total_angle - loader_origin_angle) <= dead_angle)
-                {
-                    DJIMotorSetRef(loader, rate);
-                    
-                }
-                else{
-                    DJIMotorSetRef(loader, 0);
-                    last_goal = goal;
-                    flag_2006 = 1;
-                }                
-                
-            }
-            else if(last_goal == 1 && goal == 0)
-            {
-                rate = -20000;
-                loader_origin_angle = loader->measure.total_angle;
-                if((loader_origin_angle - loader->measure.total_angle ) <= dead_angle){
-                    DJIMotorSetRef(loader, rate);
-                }
-                else{
-                    DJIMotorSetRef(loader, 0);
-                    last_goal = goal;
-                    flag_2006 = 1;
-                }   
-            }
-            else{
-                flag_2006 = 1;
-            }
-
-        }
-
-        // DJIMotorSetRef(loader, shoot_cmd_recv.shoot_rate);
+        DJIMotorSetRef(loader, shoot_cmd_recv.shoot_rate);
         break;
     case LOAD_REVERSE:
         DJIMotorOuterLoop(loader, SPEED_LOOP);
@@ -195,17 +227,6 @@ void ShootTask()
         break;
        
     }
-
-    // 设置舵机的开关
-    // if (shoot_cmd_recv.banji_mode == BANJI_ON)
-    // {
-    //     ServoSetAngle(banji_motor,0.075);
-    // }
-    // else 
-    // {
-    //      ServoSetAngle(banji_motor,0.065);       
-    // }
-
 
 
     // 反馈数据,目前暂时没有要设定的反馈数据,后续可能增加应用离线监测以及卡弹反馈

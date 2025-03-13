@@ -5,7 +5,7 @@
 #include "message_center.h"
 #include "bsp_dwt.h"
 #include "general_def.h"
-
+#include "remote_control.h"
 /* 对于双发射机构的机器人,将下面的数据封装成结构体即可,生成两份shoot应用实例 */
 static DJIMotorInstance *loader; // 拨盘电机
 static ServoInstance *banji_motor;
@@ -18,10 +18,21 @@ static Shoot_Upload_Data_s shoot_feedback_data; // 来自cmd的发射控制信�
 // dwt定时,计算冷却用
 static float hibernate_time = 0, dead_time = 10;
 
+float loader_origin_angle = 0;
+float dead_angle = 2000;
+extern RC_ctrl_t *rc_data;
+
+int flag_2006 = 0;
 float rate = 20000;  //转动速度
 int last_goal = 0;  //上次目标
 extern int goal;
 extern int flag_3508;
+extern int flag_servo;
+extern int flag_delay;
+extern int flag_set;
+extern int flag_pause;
+extern int flag_back;
+
 
 void ShootInit()
 {
@@ -101,12 +112,26 @@ void ShootTask()
         switch(shoot_cmd_recv.banji_mode)
         {
         case BANJI_OFF:
-            ServoSetAngle(banji_motor,0.064);
+            ServoSetAngle(banji_motor,0.063);
             break;
         case BANJI_ON:
-            ServoSetAngle(banji_motor,0.076);
+            if(flag_servo == 0){
+                ServoSetAngle(banji_motor,0.070);
+            }
+            else if(flag_2006 == 1){
+                ServoSetAngle(banji_motor,0.076);
+            }
+            
             // ServoSetAngle(banji_motor,0.074);
-            flag_3508 = 0;
+            if(flag_back == 1){
+                flag_servo = 0;
+                flag_delay = 0;
+                flag_3508 = 0;
+                flag_set = 0;
+                flag_pause = 0;  
+                flag_2006 = 0;              
+            }
+
             break;
         default:
             break;        
@@ -124,32 +149,43 @@ void ShootTask()
         break;
     case LOAD_NORMAL:
         DJIMotorOuterLoop(loader, SPEED_LOOP);
-        // if(flag_servo == 1){
-        //     if(last_goal == 0 && goal == 1)
-        //     {
-        //         rate = 20000;
-        //         hibernate_time = DWT_GetTimeline_ms(); // 记录开始时间
-        //         last_goal = goal;
-        //     }
-        //     else if(last_goal == 1 && goal == 0)
-        //     {
-        //         rate = -20000;
-        //         hibernate_time = DWT_GetTimeline_ms(); // 记录开始时间
-        //         last_goal = goal;
-        //     }
-
-        //     // 检查是否达到指定的运行时间
-        //     if (DWT_GetTimeline_ms() - hibernate_time >= dead_time)
-        //     {
-        //         DJIMotorSetRef(loader, 0);
+        if(flag_servo == 1){
+            if(last_goal == 0 && goal == 1)
+            {
+                rate = 20000;
+                loader_origin_angle = loader->measure.total_angle;
+                if ((loader->measure.total_angle - loader_origin_angle) <= dead_angle)
+                {
+                    DJIMotorSetRef(loader, rate);
+                    
+                }
+                else{
+                    DJIMotorSetRef(loader, 0);
+                    last_goal = goal;
+                    flag_2006 = 1;
+                }                
                 
-        //     }
-        //     else{
-        //         DJIMotorSetRef(loader, rate);
-        //     }
-        // }
+            }
+            else if(last_goal == 1 && goal == 0)
+            {
+                rate = -20000;
+                loader_origin_angle = loader->measure.total_angle;
+                if((loader_origin_angle - loader->measure.total_angle ) <= dead_angle){
+                    DJIMotorSetRef(loader, rate);
+                }
+                else{
+                    DJIMotorSetRef(loader, 0);
+                    last_goal = goal;
+                    flag_2006 = 1;
+                }   
+            }
+            else{
+                flag_2006 = 1;
+            }
 
-        DJIMotorSetRef(loader, shoot_cmd_recv.shoot_rate);
+        }
+
+        // DJIMotorSetRef(loader, shoot_cmd_recv.shoot_rate);
         break;
     case LOAD_REVERSE:
         DJIMotorOuterLoop(loader, SPEED_LOOP);

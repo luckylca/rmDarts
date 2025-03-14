@@ -22,7 +22,7 @@
 #include "bsp_dwt.h"
 #include "referee_UI.h"
 #include "arm_math.h"
-
+#include <stdbool.h>
 /* 根据robot_def.h中的macro自动计算的参数 */
 #define HALF_WHEEL_BASE (WHEEL_BASE / 2.0f)     // 半轴距
 #define HALF_TRACK_WIDTH (TRACK_WIDTH / 2.0f)   // 半轮距
@@ -47,9 +47,14 @@ static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据�
                               
 static DJIMotorInstance *motor_lf, *motor_rf; // left right forward back
 
-static float original_angle = 0;
-int read_original_angle = 1;
+// 左右电机上电角度
+static float original_angle_left = 0;
+static float original_angle_right = 0;
 
+// 读取上电角度标志位
+int read_original_3508_angle = 1;
+// 与上电角度的误差
+float err_of_original_angle = 0;
 static float dt = 0;
 /* 用于自旋变速策略的时间变量 */
 // static float t;
@@ -59,17 +64,26 @@ static float chassis_v1, chassis_v_;     // 将云台系的速度投影到底盘
 static float vt_lf, vt_rf, vt_lb, vt_rb; // 底盘速度解算后的临时输出,待进行限幅
 
 extern double F_data_1;
-int flag_3508 = 0; // 发射后重拉
-extern int flag_servo ; // 设定目标后将3508复位
-int shooted_flag = 0;
-int flag_delay = 0; 
-int flag_back = 0;
-int flag_set = 0;
-//放镖完毕标志位
-int flag_pause = 0;
-extern int flag_2006;
+// 3508到位标志位
+int flag_3508_ready = 0;
 
-float des = 84; //固定位置力大小
+extern int flag_arm_sucess ;
+
+int shooted_flag = 0;
+// 等待装载延时标志位
+int flag_wait_dart_load_delay = 0; 
+// 3508归位的标志位
+int flag_3508_back = 0;
+
+//放镖完毕标志位
+int flag_loadok = 0;
+extern bool flag_2006_target_ready;
+extern bool flag_2006_back;
+
+//固定位置力大小
+#define FOCE_3508_STAY 84
+//转动速度
+#define SPEED_3508 -4000
 float load_dart_force = 0; // 通过装载飞镖的力的大小来确定位置
 float shoot_16m_force = 0; // 打击16m距离所需要的力
 float shoot_25m_force = 0; // 打击25m距离所需要的力
@@ -157,17 +171,19 @@ void ChassisTask()
     { // 如果出现重要模块离线或遥控器设置为急停,让电机停止
         DJIMotorStop(motor_lf);
         DJIMotorStop(motor_rf);
-
     }
     else
-    { // 正常工作
-        if(read_original_angle==1)
-        {
-            original_angle = motor_lf->measure.total_angle;
-            read_original_angle = 0;
-        }
+    {
         DJIMotorEnable(motor_lf);
         DJIMotorEnable(motor_rf);
+    }
+    
+    // 正常工作,初始化左右电机初始角度
+    if(read_original_3508_angle==1)
+    {
+        original_angle_left = motor_lf->measure.total_angle;
+        original_angle_right = motor_rf->measure.total_angle;
+        read_original_3508_angle = 0;
     }
 
     // 根据控制模式设定旋转速度
@@ -179,67 +195,55 @@ void ChassisTask()
             break;
         case AUTO_MODE: 
             // 当3508还没有到位，并且拉力小于目标拉力时
-            if(flag_3508==0||flag_servo==0)
+            if( (flag_3508_ready == 0 || flag_arm_sucess == 0) && flag_2006_target_ready == false)
             {
                 // 等待
-                if(flag_pause == 0)
+                if(flag_loadok == 0)
                 {
                     DWT_Delay(2);
-                    
-                    flag_pause = 1;
+                    // 飞镖装载完毕标志位
+                    flag_loadok = 1;
                 } 
 
-                // if(flag_set == 0 && F_data_1 ==des)
-                // {
-                //     // 到达目标位置
-                //     flag_set == 1;
-                // }
-
-                if(F_data_1 <= des)
+                if(F_data_1 <= FOCE_3508_STAY)
                 {
-                    DJIMotorSetRef(motor_lf, v);
-                    DJIMotorSetRef(motor_rf, v);
+                    DJIMotorSetRef(motor_lf, SPEED_3508);
+                    DJIMotorSetRef(motor_rf, SPEED_3508);
                 }
                 else
                 {
-                    DJIMotorSetRef(motor_lf, -v);
-                    DJIMotorSetRef(motor_rf, -v);                   
+                    DJIMotorSetRef(motor_lf, -0.2*SPEED_3508);
+                    DJIMotorSetRef(motor_rf, -0.2*SPEED_3508);                   
                 }
-
-                flag_back = 0;
             }
 
-            else if(flag_servo == 1)
+            else if(flag_arm_sucess == 1 && flag_3508_ready == 1)
             {   
                 // 放镖延时
-                if(flag_delay == 0)
+                if(flag_wait_dart_load_delay == 0)
                 {
                     DWT_Delay(5);
-                    flag_delay=1;
+                    flag_wait_dart_load_delay=1;
                 }
 
-                // 2006还没到位，且拉力小于85
-                if(flag_2006 == 0 && F_data_1 <= 85)
-                {
-                    DJIMotorSetRef(motor_lf, v);
-                    DJIMotorSetRef(motor_rf, v);
-                }
+
                 // 如果2006到位，电机回到原位准备发射
-                if(flag_2006 == 1)
+                if(flag_2006_target_ready == true && flag_3508_back == 0)
                 {
-                    float see = motor_lf->measure.total_angle - original_angle;
-
-                    if(see > 0)
+                    // 计算误差
+                    err_of_original_angle = motor_lf->measure.total_angle - original_angle_left;
+                    // 归位时不受力所以直接3508到位后拉力给0
+                    if(err_of_original_angle > 0)
                     {
-                        DJIMotorSetRef(motor_lf, -v);
-                        DJIMotorSetRef(motor_rf, -v);
+                        DJIMotorSetRef(motor_lf, -SPEED_3508);
+                        DJIMotorSetRef(motor_rf, -SPEED_3508);
                     }
                     else
                     {
                         DJIMotorSetRef(motor_lf, 0);
                         DJIMotorSetRef(motor_rf, 0);
                         // 3508归位标志位
-                        flag_back = 1;
+                        flag_3508_back = 1;
                     }   
                 }
             }        
@@ -249,10 +253,10 @@ void ChassisTask()
                 DJIMotorSetRef(motor_rf, 0);
             }
 
-
-            if(flag_3508 == 0 && F_data_1 >=des)
-            {
-                flag_3508 = 1;
+            // 3508到位判断
+            if(flag_3508_ready == 0 && F_data_1 >= FOCE_3508_STAY)
+            {   
+                flag_3508_ready = 1;
             }
 
             break;

@@ -88,10 +88,13 @@ static int time = 0;
 static int last_time=RC_SW_DOWN;
 int yaw_control_servo = -118 + 180;
 
-int flag_servo=0;
-goal_of_dart goal = ANGLE_16M;
-extern int flag_3508;
+// 舵机机械臂完成标志位
+int flag_arm_sucess=0;
+// 打击目标（默认16m
+goal_of_dart goal = ANGLE_LOAD;
 
+extern int flag_3508_ready;
+extern bool flag_2006_back;
 int last_val = 0;
 
 struct Vision_angle
@@ -205,7 +208,8 @@ static void RemoteControlSet()
         chassis_cmd_send.chassis_mode = OPEN_3508;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
         shoot_cmd_send.load_mode = LOAD_NORMAL;
-        goal=0;
+        
+
         if(rc_data[TEMP].rc.rocker_r_>200)
         { 
             shoot_cmd_send.shoot_rate =20000;
@@ -233,7 +237,8 @@ static void RemoteControlSet()
         chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
         shoot_cmd_send.load_mode = AUTO_LOAD;
-        goal=1;
+        goal = ANGLE_LOAD;
+
         if(rc_data[TEMP].rc.rocker_r_>200)
         { 
             shoot_cmd_send.shoot_rate =20000;
@@ -251,15 +256,13 @@ static void RemoteControlSet()
 
 
 
-    
-    // 拨轮打开发射
-    if (rc_data[TEMP].rc.dial > 0 )
+    if(switch_is_up(rc_data[TEMP].rc.switch_right))
     {
-        if(switch_is_up(rc_data[TEMP].rc.switch_right))
-        {
-            shoot_cmd_send.banji_mode = BANJI_ON_AUTO;
-        }
-        else
+        shoot_cmd_send.banji_mode = BANJI_ON_AUTO;
+    }
+    else if (rc_data[TEMP].rc.dial > 0 )// 拨轮打开发射
+    {
+
             shoot_cmd_send.banji_mode = BANJI_ON;
     }
     else
@@ -749,8 +752,8 @@ void arm_task_44()
 void uart1Task()
 {
     // RemoteControl_outline_ALARM();
-if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP && flag_3508 == 1 && flag_servo == 0)// 左 侧开关状态[上],
-//    if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP)// 左 侧开关状态[上],
+if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP && flag_3508_ready == 1 && flag_2006_back == true && flag_arm_sucess == 0)// 左 侧开关状态[上],
+//    if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP)// 左 侧开关状态[上], 
     {
          switch (time)
         {
@@ -781,7 +784,8 @@ if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP && flag_3
             default:
                 break;
         }
-        flag_servo = 1;
+        flag_arm_sucess = 1;
+        goal = ANGLE_16M;
     }
     last_time=rc_data[TEMP].rc.switch_left;
 

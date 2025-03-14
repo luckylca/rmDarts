@@ -135,12 +135,17 @@ typedef enum
 } loader_mode_e;
 
 
+// 目标宏定义
 typedef enum
-{
+{   
+    // 打击16m目标
     ANGLE_16M = 0,
+    // 打击25m目标
     ANGLE_25M,
-    ANGLE_SHOOT
+    // 归位，装载位
+    ANGLE_LOAD
 } goal_of_dart;
+
 // 功率限制,从裁判系统获取,是否有必要保留?
 typedef struct
 { // 功率控制

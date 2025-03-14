@@ -117,6 +117,20 @@ int16_t remap_left_and_right(int16_t value)
     }
 }
 
+int16_t remap_channel_8(int16_t value)
+{
+    if(value >=0)
+    {
+        return 1;
+    }
+    else if(value <0)
+    {
+        return 0;
+    }
+  
+}
+
+
 int16_t dead_line(int16_t value)
 {
     if(abs(value)<10)
@@ -147,7 +161,7 @@ static void sbus_to_rc_cyy(const uint8_t *sbus_buf)
             // 开关,0左1右
             rc_ctrl[TEMP].rc.switch_right = remap_left_and_right((int)((((sbus_buf[i+7] >> 7 | sbus_buf[i+8] << 1 | sbus_buf[9] << 9) & 0x07FF) - RC_CH_VALUE_MIDDLE_CYY)*660/800));     //!< Switch right
             rc_ctrl[TEMP].rc.switch_left =  remap_left_and_right((int)((((sbus_buf[i+6] >> 4 | sbus_buf[i+7] << 4) & 0x07FF)    - RC_CH_VALUE_MIDDLE_CYY)*660/800)); //!< Switch left
-            rc_ctrl[TEMP].mouse.x = remap_left_and_right((int)(( ((sbus_buf[i+10] >> 5 | sbus_buf[i+11] << 3) & 0x07FF)  - RC_CH_VALUE_MIDDLE_CYY)*660/800));
+            rc_ctrl[TEMP].mouse.x = remap_channel_8((int)(( ((sbus_buf[i+10] >> 5 | sbus_buf[i+11] << 3) & 0x07FF)  - RC_CH_VALUE_MIDDLE_CYY)*660/800));
             if(rc_ctrl[TEMP].rc.dial == -660)
             {
                 rc_ctrl[TEMP].rc.switch_right = 2;

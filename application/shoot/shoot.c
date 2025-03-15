@@ -165,7 +165,7 @@ void ShootTask()
                         ServoSetAngle(banji_motor,0.063);
                 }
                 
-                if(flag_3508_back == 1)
+                
                 
 
                 break;

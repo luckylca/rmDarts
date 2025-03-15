@@ -96,6 +96,9 @@ goal_of_dart goal = ANGLE_LOAD;
 extern int flag_3508_ready;
 extern bool flag_2006_back;
 int last_val = 0;
+bool flag_init_goal = false;
+
+
 
 struct Vision_angle
 {
@@ -237,7 +240,12 @@ static void RemoteControlSet()
         chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
         shoot_cmd_send.load_mode = AUTO_LOAD;
-        goal = ANGLE_LOAD;
+        if(flag_init_goal==false)
+        {
+            goal = ANGLE_LOAD;
+            flag_init_goal = true;
+        }
+        
 
         if(rc_data[TEMP].rc.rocker_r_>200)
         { 

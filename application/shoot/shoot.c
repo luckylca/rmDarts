@@ -26,6 +26,7 @@ static float hibernate_time = 0, dead_time = 10;
 float loader_origin_angle = 0;
 float dead_angle = 2000;
 extern RC_ctrl_t *rc_data;
+float loader_err = 0;
 
 // 2006归位标志位
 bool flag_2006_back = false;
@@ -42,7 +43,7 @@ extern int flag_loadok;
 extern int flag_3508_back;
 
 // 2006从初始位置开始记圈到16m的数据
-#define TOTAL_ANGLE_16M  0 
+#define TOTAL_ANGLE_16M  (-292042) 
 // 2006从初始位置开始记圈到25m的数据
 #define TOTAL_ANGLE_25M  0
 
@@ -133,7 +134,8 @@ void ShootTask()
                 ServoSetAngle(banji_motor,0.063);
                 break;
             case BANJI_ON:
-                ServoSetAngle(banji_motor,0.074);
+                ServoSetAngle(banji_motor,0.078);
+                break;
             case BANJI_ON_AUTO:
 
                 if(flag_arm_sucess == 0 || flag_3508_ready == 0)
@@ -146,7 +148,7 @@ void ShootTask()
                     // 3508归位 并且 机械臂完成放镖 镖体成功装载
                     if( flag_3508_back == 1 && flag_arm_sucess == 1 && flag_wait_dart_load_delay == 1)
                     {
-                        ServoSetAngle(banji_motor, 0.076);
+                        ServoSetAngle(banji_motor, 0.078);
                         DWT_Delay(3);
 
                         {
@@ -194,22 +196,25 @@ void ShootTask()
             // 打击十六米目标
             case ANGLE_16M:
                 rate = 20000;
-                if ((loader->measure.total_angle - TOTAL_ANGLE_16M) <= -20)
+                loader_err = loader->measure.total_angle - TOTAL_ANGLE_16M;
+                if (loader_err <= -200)
                 {
-                    DJIMotorSetRef(loader, rate);   
+                    DJIMotorSetRef(loader, 20000);   
                 }
-                else if((loader->measure.total_angle - TOTAL_ANGLE_16M) >= 20)
+                else if(loader_err >= 200)
                 {
-                    DJIMotorSetRef(loader, -rate);
+                    DJIMotorSetRef(loader, -20000);
                 }
                 else
+                {
                     DJIMotorSetRef(loader, 0);
-                    flag_2006_target_ready = true;                
+                    flag_2006_target_ready = true;
+                }                
                 break;
             // 打击二十米目标，等待测量
             case ANGLE_25M:
                 rate = 20000;
-                if ((loader->measure.total_angle - TOTAL_ANGLE_25M )<= -DEAD_LINE_LOAD)
+                if ((loader->measure.total_angle - TOTAL_ANGLE_25M ) <= -DEAD_LINE_LOAD)
                 {
                     DJIMotorSetRef(loader, rate);   
                 }
@@ -218,8 +223,10 @@ void ShootTask()
                     DJIMotorSetRef(loader, -rate);
                 }
                 else
+                {
                     DJIMotorSetRef(loader, 0);
-                    flag_2006_target_ready = true;                
+                    flag_2006_target_ready = true;  
+                }              
                 break;
             // 装载角度模式，此处设置为初始化时的角度
             case ANGLE_LOAD:
@@ -233,13 +240,15 @@ void ShootTask()
                     DJIMotorSetRef(loader, -rate);
                 }
                 else
+                {
                     DJIMotorSetRef(loader, 0);
-                    flag_2006_back = true;                
+                    flag_2006_back = true;   
+                }             
                 break;
             default:
                 break;
         }
-
+        break;
     case LOAD_NORMAL:
         DJIMotorOuterLoop(loader, SPEED_LOOP);
         DJIMotorSetRef(loader, shoot_cmd_recv.shoot_rate);

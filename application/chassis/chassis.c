@@ -62,11 +62,11 @@ static float dt = 0;
 /* 私有函数计算的中介变量,设为静态避免参数传递的开销 */
 static float chassis_v1, chassis_v_;     // 将云台系的速度投影到底盘
 static float vt_lf, vt_rf, vt_lb, vt_rb; // 底盘速度解算后的临时输出,待进行限幅
-
+// 拉力传感器数据
 extern double F_data_1;
 // 3508到位标志位
 int flag_3508_ready = 0;
-
+// 完成机械臂动作
 extern int flag_arm_sucess ;
 
 int shooted_flag = 0;
@@ -77,16 +77,18 @@ int flag_3508_back = 0;
 
 //放镖完毕标志位
 int flag_loadok = 0;
+
 extern bool flag_2006_target_ready;
 extern bool flag_2006_back;
 
 //固定位置力大小
-#define FOCE_3508_STAY 84
+#define FOCE_3508_STAY 80
 //转动速度
 #define SPEED_3508 -4000
-float load_dart_force = 0; // 通过装载飞镖的力的大小来确定位置
-float shoot_16m_force = 0; // 打击16m距离所需要的力
-float shoot_25m_force = 0; // 打击25m距离所需要的力
+
+// float load_dart_force = 0; // 通过装载飞镖的力的大小来确定位置
+// float shoot_16m_force = 0; // 打击16m距离所需要的力
+// float shoot_25m_force = 0; // 打击25m距离所需要的力
 
 float v = -4000;  //转动速度
 
@@ -212,8 +214,8 @@ void ChassisTask()
                 }
                 else
                 {
-                    DJIMotorSetRef(motor_lf, -0.2*SPEED_3508);
-                    DJIMotorSetRef(motor_rf, -0.2*SPEED_3508);                   
+                    DJIMotorSetRef(motor_lf, 0.5*SPEED_3508);
+                    DJIMotorSetRef(motor_rf, 0.5*SPEED_3508);                   
                 }
             }
 
@@ -246,7 +248,7 @@ void ChassisTask()
                         flag_3508_back = 1;
                     }   
                 }
-            }        
+            }
             else
             {
                 DJIMotorSetRef(motor_lf, 0);

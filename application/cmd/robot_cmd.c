@@ -230,7 +230,7 @@ static void RemoteControlSet()
     else if (switch_is_down(rc_data[TEMP].rc.switch_right)) // 
     {
         chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
-        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
+        gimbal_cmd_send.gimbal_mode = AUTO_DART;
         shoot_cmd_send.banji_mode = BANJI_OFF;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
         shoot_cmd_send.load_mode = LOAD_STOP;
@@ -385,7 +385,7 @@ static void EmergencyHandler()
     { 
         
         alarm_count++;
-        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
+        gimbal_cmd_send.gimbal_mode = AUTO_DART;
         chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
         shoot_cmd_send.banji_mode = BANJI_OFF;

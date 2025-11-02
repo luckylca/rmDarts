@@ -47,8 +47,13 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
-build
-./idea
+
+# Build and dependencies
+build/
+Drivers/
+
+# IDE
+.idea/
 .vscode/.cortex-debug.peripherals.state.json
 .vscode/.cortex-debug.registers.state.json
 *.jdebug*

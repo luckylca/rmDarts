@@ -36,6 +36,12 @@ typedef struct
     uint16_t Kp;
     uint16_t Kd;
 }DMMotor_Send_s;
+typedef enum
+{
+    DM_MIT_MODE=0,
+    DM_SPEED_MODE = 1,
+    DM_POSITION_SPEED_MODE =2,
+}DMWorkingMode;
 typedef struct 
 {
     DM_Motor_Measure_s measure;
@@ -48,6 +54,8 @@ typedef struct
     float *speed_feedforward_ptr;
     float *current_feedforward_ptr;
     float pid_ref;
+    float tff; // 力矩前馈
+    DMWorkingMode working_mode;
     Motor_Working_Type_e stop_flag;
     CANInstance *motor_can_instance;
     DaemonInstance* motor_daemon;
@@ -62,9 +70,9 @@ typedef enum
     DM_CMD_CLEAR_ERROR = 0xfb // 清除电机过热错误
 }DMMotor_Mode_e;
 
-DMMotorInstance *DMMotorInit(Motor_Init_Config_s *config);
+DMMotorInstance *DMMotorInit(Motor_Init_Config_s *config,DMWorkingMode working_mode);
 
-void DMMotorSetRef(DMMotorInstance *motor, float ref);
+void DMMotorSetRef(DMMotorInstance *motor, float ref ,float tff);
 
 void DMMotorOuterLoop(DMMotorInstance *motor,Closeloop_Type_e closeloop_type);
 

@@ -131,7 +131,8 @@ typedef enum
     LOAD_STOP = 0,  // 停止发射
     LOAD_REVERSE,   // 反转
     LOAD_NORMAL,  // zheng
-    AUTO_LOAD
+    AUTO_LOAD,
+    TEST,
 } loader_mode_e;
 
 
@@ -186,6 +187,7 @@ typedef struct
     loader_mode_e load_mode;
     banji_mode_e banji_mode;
     float shoot_rate;
+    float banjiPos;
 } Shoot_Ctrl_Cmd_s;
 
 /* ----------------gimbal/shoot/chassis发布的反馈数据----------------*/

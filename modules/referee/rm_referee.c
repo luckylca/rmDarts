@@ -71,6 +71,10 @@ static void JudgeReadData(uint8_t *buff)
 				case ID_supply_projectile_action: // 0x0102
 					memcpy(&referee_info.SupplyProjectileAction, (buff + DATA_Offset), LEN_supply_projectile_action);
 					break;
+
+				case ID_dart_info: // 0x0105
+					memcpy(&referee_info.DartInfo, (buff + DATA_Offset), LEN_dart_info);
+
 				case ID_game_robot_state: // 0x0201
 					memcpy(&referee_info.GameRobotState, (buff + DATA_Offset), LEN_game_robot_state);
 					break;
@@ -92,6 +96,11 @@ static void JudgeReadData(uint8_t *buff)
 				case ID_shoot_data: // 0x0207
 					memcpy(&referee_info.ShootData, (buff + DATA_Offset), LEN_shoot_data);
 					break;
+
+				case ID_dart_client_cmd: // 0x020A
+					memcpy(&referee_info.DartCmd, (buff + DATA_Offset), LEN_dart_client_cmd);
+					break;	
+					
 				case ID_student_interactive: // 0x0301   syhtodo接收代码未测试
 					memcpy(&referee_info.ReceiveData, (buff + DATA_Offset), LEN_receive_data);
 					break;

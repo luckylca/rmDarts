@@ -63,11 +63,20 @@ void DMMotorCaliEncoder(DMMotorInstance *motor)
     DMMotorSetMode(DM_CMD_ZERO_POSITION, motor);
     DWT_Delay(0.1);
 }
-DMMotorInstance *DMMotorInit(Motor_Init_Config_s *config)
+
+DMMotorInstance *DMMotorInit(Motor_Init_Config_s *config, DMWorkingMode working_mode)
 {
     DMMotorInstance *motor = (DMMotorInstance *)malloc(sizeof(DMMotorInstance));
     memset(motor, 0, sizeof(DMMotorInstance));
-    
+
+    if (working_mode == DM_MIT_MODE)
+    {
+        motor->working_mode = DM_MIT_MODE;
+    }
+
+    // motor->measure.total_angle = readDmMotorTotalAngleSetByIndex(idx);
+    // motor->measure.total_round = motor->measure.total_angle / 360.0f;
+
     motor->motor_settings = config->controller_setting_init_config;
     PIDInit(&motor->current_PID, &config->controller_param_init_config.current_PID);
     PIDInit(&motor->speed_PID, &config->controller_param_init_config.speed_PID);
@@ -78,6 +87,8 @@ DMMotorInstance *DMMotorInit(Motor_Init_Config_s *config)
     config->can_init_config.can_module_callback = DMMotorDecode;
     config->can_init_config.id = motor;
     motor->motor_can_instance = CANRegister(&config->can_init_config);
+
+
 
     Daemon_Init_Config_s conf = {
         .callback = DMMotorLostCallback,
@@ -95,17 +106,19 @@ DMMotorInstance *DMMotorInit(Motor_Init_Config_s *config)
     return motor;
 }
 
-void DMMotorSetRef(DMMotorInstance *motor, float ref)
+void DMMotorSetRef(DMMotorInstance *motor, float ref,float tff)
 {
     motor->pid_ref = ref;
+    motor->tff = tff;
 }
+
 
 void DMMotorEnable(DMMotorInstance *motor)
 {
     motor->stop_flag = MOTOR_ENALBED;
 }
 
-void DMMotorStop(DMMotorInstance *motor)//不使用使能模式是因为需要收到反馈
+void DMMotorStop(DMMotorInstance *motor) // 不使用使能模式是因为需要收到反馈
 {
     motor->stop_flag = MOTOR_STOP;
 }
@@ -115,34 +128,39 @@ void DMMotorOuterLoop(DMMotorInstance *motor, Closeloop_Type_e type)
     motor->motor_settings.outer_loop_type = type;
 }
 
-
 //@Todo: 目前只实现了力控，更多位控PID等请自行添加
 void DMMotorTask(void const *argument)
 {
-    float  pid_ref, set;
+    float pid_ref, set, tffSet, kp, kd;
     DMMotorInstance *motor = (DMMotorInstance *)argument;
-   //DM_Motor_Measure_s *measure = &motor->measure;
+    // DM_Motor_Measure_s *measure = &motor->measure;
     Motor_Control_Setting_s *setting = &motor->motor_settings;
-    //CANInstance *motor_can = motor->motor_can_instace;
-    //uint16_t tmp;
+    // CANInstance *motor_can = motor->motor_can_instace;
+    // uint16_t tmp;
     DMMotor_Send_s motor_send_mailbox;
     while (1)
     {
-        pid_ref = motor->pid_ref;
-        
-        set = pid_ref;
-        if (setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)
-            set *= -1;
-       
-        LIMIT_MIN_MAX(set, DM_T_MIN, DM_T_MAX);
-        motor_send_mailbox.position_des = float_to_uint(0, DM_P_MIN, DM_P_MAX, 16);
-        motor_send_mailbox.velocity_des = float_to_uint(0, DM_V_MIN, DM_V_MAX, 12);
-        motor_send_mailbox.torque_des = float_to_uint(pid_ref, DM_T_MIN, DM_T_MAX, 12);
-        motor_send_mailbox.Kp = 0;
-        motor_send_mailbox.Kd = 0;
+        if (motor->working_mode == DM_MIT_MODE)//如果使用 MIT 模式，底层需要大改，需要拿到期望的位置和期望的速度，甚至还有 kp 和 kd
+        {
+            tffSet = motor->tff;
+            kp = motor->current_PID.Kp;
+            kd = motor->current_PID.Kd;
+            pid_ref = motor->pid_ref;
+            if (setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)
+                pid_ref *= -1;
 
-        if(motor->stop_flag == MOTOR_STOP)
-            motor_send_mailbox.torque_des = float_to_uint(0, DM_T_MIN, DM_T_MAX, 12);
+            LIMIT_MIN_MAX(pid_ref, DM_P_MIN, DM_P_MAX);
+            motor_send_mailbox.position_des = float_to_uint(pid_ref, DM_P_MIN, DM_P_MAX, 16);
+            motor_send_mailbox.velocity_des = float_to_uint(0, DM_V_MIN, DM_V_MAX, 12);
+            motor_send_mailbox.torque_des = float_to_uint(tffSet, DM_T_MIN, DM_T_MAX, 12);
+            motor_send_mailbox.Kp = kp;
+            motor_send_mailbox.Kd = kd;
+
+            if (motor->stop_flag == MOTOR_STOP)
+                motor_send_mailbox.torque_des = float_to_uint(0, DM_T_MIN, DM_T_MAX, 12);
+
+        }
+
 
         motor->motor_can_instance->tx_buff[0] = (uint8_t)(motor_send_mailbox.position_des >> 8);
         motor->motor_can_instance->tx_buff[1] = (uint8_t)(motor_send_mailbox.position_des);

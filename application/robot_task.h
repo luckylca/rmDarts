@@ -13,6 +13,7 @@
 #include "master_process.h"
 #include "daemon.h"
 #include "HT04.h"
+#include "dmmotor.h"
 #include "buzzer.h"
 #include "remote_control.h"
 #include "bsp_log.h"
@@ -35,7 +36,7 @@ void StartUART1TASK(void const *argument);
 void StartUART6TASK(void const *argument);
 
 
-     
+
 /**
  * @brief 初始化机器人任务,所有持续运行的任务都在这里初始化
  *
@@ -59,15 +60,15 @@ void OSTaskInit()
     // osThreadDef(uitask, StartUITASK, osPriorityNormal, 0, 512);
     // uiTaskHandle = osThreadCreate(osThread(uitask), NULL);
 
-    osThreadDef(uart1task, StartUART1TASK, osPriorityNormal, 0, 256);
-    uart1TaskHandle = osThreadCreate(osThread(uart1task), NULL);
+    // osThreadDef(uart1task, StartUART1TASK, osPriorityNormal, 0, 256);
+    // uart1TaskHandle = osThreadCreate(osThread(uart1task), NULL);
 
-    // uart6测试任务
-    // todo: 可以改成其他任务
     // osThreadDef(uart6task, StartUART6TASK, osPriorityNormal, 0, 256);
     // uart6TaskHandle = osThreadCreate(osThread(uart6task), NULL);
 
-    HTMotorControlInit(); // 没有注册HT电机则不会执行
+
+    DMMotorControlInit();//为所有的达妙电机注册任务
+    // HTMotorControlInit(); // 没有注册HT电机则不会执行
 }
 
 __attribute__((noreturn)) void StartINSTASK(void const *argument)
@@ -166,7 +167,7 @@ __attribute__((noreturn)) void StartUART1TASK(void const *argument)
         //     // 处理接收到的数据
         //     LOGINFO("Received data: %d", data);
         // }
-        uart1Task();
+        // uart1Task();
            // 遥控器数据,初始化时返回
         osDelay(1);
     }

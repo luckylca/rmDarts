@@ -75,9 +75,15 @@ typedef enum
 	ID_event_data = 0x0101,				   // 场地事件数据
 	ID_supply_projectile_action = 0x0102,  // 场地补给站动作标识数据
 	ID_supply_projectile_booking = 0x0103, // 场地补给站预约子弹数据
+
+	ID_dart_info = 0x0105,					//飞镖信息
+
 	ID_game_robot_state = 0x0201,		   // 机器人状态数据
 	ID_power_heat_data = 0x0202,		   // 实时功率热量数据
 	ID_game_robot_pos = 0x0203,			   // 机器人位置数据
+
+	ID_dart_client_cmd = 0x020A,			//飞镖命令
+
 	ID_buff_musk = 0x0204,				   // 机器人增益数据
 	ID_aerial_robot_energy = 0x0205,	   // 空中机器人能量状态数据
 	ID_robot_hurt = 0x0206,				   // 伤害状态数据
@@ -93,6 +99,9 @@ typedef enum
 	LEN_game_robot_HP = 32,						 // 0x0003
 	LEN_event_data = 4,							 // 0x0101
 	LEN_supply_projectile_action = 4,			 // 0x0102
+
+	LEN_dart_info = 3,							 // 0x0105
+
 	LEN_game_robot_state = 13,					 // 0x0201
 	LEN_power_heat_data = 16,					 // 0x0202
 	LEN_game_robot_pos = 16,					 // 0x0203
@@ -100,6 +109,9 @@ typedef enum
 	LEN_aerial_robot_energy = 2,				 // 0x0205
 	LEN_robot_hurt = 1,							 // 0x0206
 	LEN_shoot_data = 7,							 // 0x0207
+
+	LEN_dart_client_cmd = 6,					// 0x020A
+
 	LEN_receive_data = 6 + Communicate_Data_LEN, // 0x0301
 	LEN_image_road = 12,						 // 0x0304
 } JudgeDataLength_e;
@@ -157,6 +169,15 @@ typedef struct
 	uint8_t supply_projectile_step;
 	uint8_t supply_projectile_num;
 } ext_supply_projectile_action_t;
+
+
+/* ID: 0x105   Byte:  3    		飞镖信息*/
+typedef struct 
+{ 
+ uint8_t dart_remaining_time; //己方飞镖发射剩余时间
+ uint16_t dart_info; //最近一次己方飞镖击中的目标	+	对方最近被击中的目标累计被击中计数	+	飞镖此时选定的击打目标
+} ext_dart_info_t; 
+
 
 /* ID: 0X0201  Byte: 13    机器人状态数据 */
 typedef struct
@@ -226,6 +247,17 @@ typedef struct
 	uint8_t bullet_freq;
 	float bullet_speed;
 } ext_shoot_data_t;
+
+/* ID: 0x020A Byte:   6	   飞镖指令 */
+typedef struct 
+{ 
+ 	uint8_t dart_launch_opening_status; //当前飞镖发射站的状态
+	uint8_t reserved; 
+ 	uint16_t target_change_time; //切换击打目标时的比赛剩余时间
+ 	uint16_t latest_launch_cmd_time; //最后一次操作手确定发射指令时的比赛剩余时间
+} ext_dart_client_cmd_t; 
+
+
 /****************************机器人交互数据****************************/
 /****************************机器人交互数据****************************/
 /* 发送的内容数据段最大为 113 检测是否超出大小限制?实际上图形段不会超，数据段最多30个，也不会超*/
@@ -268,6 +300,7 @@ typedef enum
 	UI_Data_ID_Draw2 = 0x102,
 	UI_Data_ID_Draw5 = 0x103,
 	UI_Data_ID_Draw7 = 0x104,
+	
 	UI_Data_ID_DrawChar = 0x110,
 
 	/* 自定义交互数据部分 */

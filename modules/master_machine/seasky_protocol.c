@@ -14,8 +14,40 @@
 #include "crc8.h"
 #include "crc16.h"
 #include "memory.h"
+#include <stdint.h>
 
 RX_PACKET rx_packet;
+
+// 添加单字节处理函数
+/**
+ * @brief 处理单个接收到的字节
+ * @param byte 接收到的字节
+ * @param buffer 存储字节的缓冲区
+ * @param index 当前缓冲区索引指针，会被更新
+ * @param buffer_size 缓冲区最大大小
+ * @return 1 表示缓冲区已满，0 表示缓冲区未满
+ */
+uint8_t process_single_byte(uint8_t byte, uint8_t *buffer, uint16_t *index, uint16_t buffer_size)
+{
+    // 检查缓冲区是否还有空间
+    if (*index >= buffer_size)
+    {
+        *index = 0; // 重置索引
+    }
+    
+    // 存储字节
+    buffer[(*index)++] = byte;
+    
+    // 检查缓冲区是否已满
+    if (*index >= buffer_size)
+    {
+        *index = 0; // 重置索引
+        return 1;   // 缓冲区已满
+    }
+    
+    return 0; // 缓冲区未满
+}
+
 /*获取CRC8校验码*/
 uint8_t Get_CRC8_Check(uint8_t *pchMessage,uint16_t dwLength)
 {

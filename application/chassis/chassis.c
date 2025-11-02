@@ -44,7 +44,7 @@ static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数�
 
 static referee_info_t* referee_data; // 用于获取裁判系统的数据
 static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
-                              
+
 static DJIMotorInstance *motor_lf, *motor_rf; // left right forward back
 
 // 左右电机上电角度
@@ -55,6 +55,7 @@ static float original_angle_right = 0;
 int read_original_3508_angle = 1;
 // 与上电角度的误差
 float err_of_original_angle = 0;
+
 static float dt = 0;
 /* 用于自旋变速策略的时间变量 */
 // static float t;
@@ -62,6 +63,7 @@ static float dt = 0;
 /* 私有函数计算的中介变量,设为静态避免参数传递的开销 */
 static float chassis_v1, chassis_v_;     // 将云台系的速度投影到底盘
 static float vt_lf, vt_rf, vt_lb, vt_rb; // 底盘速度解算后的临时输出,待进行限幅
+
 // 拉力传感器数据
 extern double F_data_1;
 // 3508到位标志位
@@ -69,37 +71,76 @@ int flag_3508_ready = 0;
 // 完成机械臂动作
 extern int flag_arm_sucess ;
 
-int shooted_flag = 0;
 // 等待装载延时标志位
 int flag_wait_dart_load_delay = 0; 
 // 3508归位的标志位
 int flag_3508_back = 0;
+
+//3508到最末尾标志位
+int flag_3508_max=0;
 
 //放镖完毕标志位
 int flag_loadok = 0;
 
 extern bool flag_2006_target_ready;
 extern bool flag_2006_back;
+extern goal_of_dart goal;
+extern int key;
 
 //固定位置力大小
-#define FOCE_3508_STAY 80
+#define FOCE_3508_STAY1 58
+#define FOCE_3508_STAY2 62
+#define FOCE_3508_MAX 68
 //转动速度
 #define SPEED_3508 -4000
 
-// float load_dart_force = 0; // 通过装载飞镖的力的大小来确定位置
-// float shoot_16m_force = 0; // 打击16m距离所需要的力
-// float shoot_25m_force = 0; // 打击25m距离所需要的力
 
 float v = -4000;  //转动速度
 
 void ChassisInit()
 {
     // 四个轮子的参数一样,改tx_id和反转标志位即可
-    Motor_Init_Config_s chassis_motor_config = {
-        .can_init_config.can_handle = &hcan1,
+    // Motor_Init_Config_s chassis_motor_config = {
+    //     .can_init_config.can_handle = &hcan2,
+    //     .controller_param_init_config = {
+    //         .speed_PID = {
+    //             .Kp = 4.5, // 4.5
+    //             .Ki = 0,  // 0
+    //             .Kd = 0.0001,  // 0
+    //             .IntegralLimit = 3000,
+    //             .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+    //             .MaxOut = 12000,
+    //         },
+    //         .current_PID = {
+    //             .Kp = 1, // 0.4
+    //             .Ki = 0,   // 0
+    //             .Kd = 0,
+    //             .IntegralLimit = 3000,
+    //             .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+    //             .MaxOut = 15000,
+    //         },
+    //     },
+    //     .controller_setting_init_config = {
+    //         .angle_feedback_source = MOTOR_FEED,
+    //         .speed_feedback_source = MOTOR_FEED,
+    //         .outer_loop_type = SPEED_LOOP,
+    //         .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
+    //     },
+    //     .motor_type = M3508,
+    // };
+    // //  @todo: 当前还没有设置电机的正反转,仍然需要手动添加reference的正负号,需要电机module的支持,待修改.
+    // chassis_motor_config.can_init_config.tx_id = 1;//4;
+    // chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
+    // motor_lf = DJIMotorInit(&chassis_motor_config);
+
+    // chassis_motor_config.can_init_config.tx_id = 2;//;
+    // chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;//
+    // motor_rf = DJIMotorInit(&chassis_motor_config);
+Motor_Init_Config_s chassis_motor_config1 = {
+        .can_init_config.can_handle = &hcan2,
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp = 4.5, // 4.5
+                .Kp = 1.5, // 4.5
                 .Ki = 0,  // 0
                 .Kd = 0.0001,  // 0
                 .IntegralLimit = 3000,
@@ -122,19 +163,47 @@ void ChassisInit()
             .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
         },
         .motor_type = M3508,
+        
+        .can_init_config.tx_id = 1,
+        .controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE,
     };
-    //  @todo: 当前还没有设置电机的正反转,仍然需要手动添加reference的正负号,需要电机module的支持,待修改.
-    chassis_motor_config.can_init_config.tx_id = 1;//4;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
-    motor_lf = DJIMotorInit(&chassis_motor_config);
-
-    chassis_motor_config.can_init_config.tx_id = 2;//;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;//
-    motor_rf = DJIMotorInit(&chassis_motor_config);
-
-
+    motor_lf = DJIMotorInit(&chassis_motor_config1);
+Motor_Init_Config_s chassis_motor_config2 = {
+        .can_init_config.can_handle = &hcan2,
+        .controller_param_init_config = {
+            .speed_PID = {
+                .Kp = 1.5, // 4.5
+                .Ki = 0,  // 0
+                .Kd = 0.0001,  // 0
+                .IntegralLimit = 3000,
+                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+                .MaxOut = 12000,
+            },
+            .current_PID = {
+                .Kp = 1, // 0.4
+                .Ki = 0,   // 0
+                .Kd = 0,
+                .IntegralLimit = 3000,
+                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+                .MaxOut = 15000,
+            },
+        },
+        .controller_setting_init_config = {
+            .angle_feedback_source = MOTOR_FEED,
+            .speed_feedback_source = MOTOR_FEED,
+            .outer_loop_type = SPEED_LOOP,
+            .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
+        },
+        .motor_type = M3508,
+        .can_init_config.tx_id = 2,
+        .controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
+    };
+    motor_rf = DJIMotorInit(&chassis_motor_config2);
+#if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
     // referee_data = UITaskInit(&huart6,&ui_data); // 裁判系统初始化,会同时初始化UI
-    
+    referee_data = ReTaskInit(&huart6); // 裁判系统初始化
+#endif 
+
 
 
 #ifdef CHASSIS_BOARD
@@ -192,75 +261,124 @@ void ChassisTask()
     switch (chassis_cmd_recv.chassis_mode)
     {
         case OPEN_3508: 
-            DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);
+            // DJIMotorSetRef(motor_lf, 200);
+            // DJIMotorSetRef(motor_rf, 200);
+            DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);//2000 左右能动
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
             break;
         case AUTO_MODE: 
-            // 当3508还没有到位，并且拉力小于目标拉力时
-            if( (flag_3508_ready == 0 || flag_arm_sucess == 0) && flag_2006_target_ready == false)
-            {
-                // 等待
-                if(flag_loadok == 0)
+            // if(flag_2006_back){
+                // 当3508还没有到位，并且拉力小于目标拉力时
+                if( (flag_3508_ready == 0 || flag_arm_sucess == 0) && flag_2006_target_ready == false)
                 {
-                    DWT_Delay(2);
-                    // 飞镖装载完毕标志位
-                    flag_loadok = 1;
-                } 
+                    // 等待
+                    // if(flag_loadok == 0)
+                    // {
+                    //     DWT_Delay(2);
+                    //     // 飞镖装载完毕标志位
+                    //     flag_loadok = 1;
+                    // } 
+                    if(key==1||key==2)
+                        if(F_data_1 <= FOCE_3508_STAY1)
+                        {
+                            DJIMotorSetRef(motor_lf, SPEED_3508);
+                            DJIMotorSetRef(motor_rf, SPEED_3508);
+                        }
+                        else
+                        {
+                            DJIMotorSetRef(motor_lf, 0.5*SPEED_3508);
+                            DJIMotorSetRef(motor_rf, 0.5*SPEED_3508);                   
+                        }
+                    else if(key==3||key==4){
+                        if(F_data_1 <= FOCE_3508_STAY2)
+                        {
+                            DJIMotorSetRef(motor_lf, SPEED_3508);
+                            DJIMotorSetRef(motor_rf, SPEED_3508);
+                        }
+                        else
+                        {
+                            DJIMotorSetRef(motor_lf, 0.5*SPEED_3508);
+                            DJIMotorSetRef(motor_rf, 0.5*SPEED_3508);                   
+                        }
+                    }
+                }
 
-                if(F_data_1 <= FOCE_3508_STAY)
-                {
-                    DJIMotorSetRef(motor_lf, SPEED_3508);
-                    DJIMotorSetRef(motor_rf, SPEED_3508);
+                else if(flag_arm_sucess == 1 && flag_3508_ready == 1)
+                {   
+                    // 放镖延时
+                    if(flag_wait_dart_load_delay == 0)
+                    {
+                        // goal=ANGLE_16M;
+                        DWT_Delay(1);
+                        flag_wait_dart_load_delay=1;
+                    }
+
+                    if(!flag_3508_max){
+                        if(F_data_1 <= FOCE_3508_MAX)
+                        {
+                            DJIMotorSetRef(motor_lf, SPEED_3508);
+                            DJIMotorSetRef(motor_rf, SPEED_3508);
+                        }
+                        else
+                        {
+                            DJIMotorSetRef(motor_lf, 0.5*SPEED_3508);
+                            DJIMotorSetRef(motor_rf, 0.5*SPEED_3508); 
+                            flag_3508_max=1;                  
+                        }     
+                    }
+
+                    // 如果2006到位，电机回到原位准备发射
+                    if(flag_2006_target_ready == true && flag_3508_back == 0 && flag_3508_max)
+                    {
+                        // 计算误差
+                        err_of_original_angle = motor_lf->measure.total_angle - original_angle_left;
+                        // 归位时不受力所以直接3508到位后拉力给0
+                        if(err_of_original_angle > 0)
+                        {
+                            DJIMotorSetRef(motor_lf, -SPEED_3508);
+                            DJIMotorSetRef(motor_rf, -SPEED_3508);
+                        }
+                        else
+                        {
+                            DJIMotorSetRef(motor_lf, 0);
+                            DJIMotorSetRef(motor_rf, 0);
+                            // 3508归位标志位
+                            flag_3508_back = 1;
+                        }   
+                    }
+                    else if(flag_2006_target_ready == false){
+                        if(F_data_1 <= FOCE_3508_MAX)
+                        {
+                            DJIMotorSetRef(motor_lf, SPEED_3508);
+                            DJIMotorSetRef(motor_rf, SPEED_3508);
+                        }
+                        else
+                        {
+                            DJIMotorSetRef(motor_lf, 0.5*SPEED_3508);
+                            DJIMotorSetRef(motor_rf, 0.5*SPEED_3508);                   
+                        }                        
+                    }
                 }
                 else
                 {
-                    DJIMotorSetRef(motor_lf, 0.5*SPEED_3508);
-                    DJIMotorSetRef(motor_rf, 0.5*SPEED_3508);                   
-                }
-            }
-
-            else if(flag_arm_sucess == 1 && flag_3508_ready == 1)
-            {   
-                // 放镖延时
-                if(flag_wait_dart_load_delay == 0)
-                {
-                    DWT_Delay(5);
-                    flag_wait_dart_load_delay=1;
+                    DJIMotorSetRef(motor_lf, 0);
+                    DJIMotorSetRef(motor_rf, 0);
                 }
 
-
-                // 如果2006到位，电机回到原位准备发射
-                if(flag_2006_target_ready == true && flag_3508_back == 0)
-                {
-                    // 计算误差
-                    err_of_original_angle = motor_lf->measure.total_angle - original_angle_left;
-                    // 归位时不受力所以直接3508到位后拉力给0
-                    if(err_of_original_angle > 0)
-                    {
-                        DJIMotorSetRef(motor_lf, -SPEED_3508);
-                        DJIMotorSetRef(motor_rf, -SPEED_3508);
+                // 3508到位判断
+                if(key==1||key==2){
+                    if(flag_3508_ready == 0 && F_data_1 >= FOCE_3508_STAY1)
+                    {   
+                        flag_3508_ready = 1;
                     }
-                    else
-                    {
-                        DJIMotorSetRef(motor_lf, 0);
-                        DJIMotorSetRef(motor_rf, 0);
-                        // 3508归位标志位
-                        flag_3508_back = 1;
-                    }   
                 }
-            }
-            else
-            {
-                DJIMotorSetRef(motor_lf, 0);
-                DJIMotorSetRef(motor_rf, 0);
-            }
-
-            // 3508到位判断
-            if(flag_3508_ready == 0 && F_data_1 >= FOCE_3508_STAY)
-            {   
-                flag_3508_ready = 1;
-            }
-
+                else if(key==3||key==4){
+                    if(flag_3508_ready == 0 && F_data_1 >= FOCE_3508_STAY2)
+                    {   
+                        flag_3508_ready = 1;
+                    }                    
+                }
+            // }
             break;
         default:
             break;

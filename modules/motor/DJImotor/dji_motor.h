@@ -20,6 +20,7 @@
 #include "motor_def.h"
 #include "stdint.h"
 #include "daemon.h"
+#include "at24c02.h"
 
 #define DJI_MOTOR_CNT 12
 
@@ -151,5 +152,10 @@ void DJIMotorFilterInit(DJI_Motor_Measure_s *measure);
  * @return 滤波后的电流值
  */
 float DJIMotorCurrentFilter(DJI_Motor_Measure_s *measure, float new_value);
-
+/**
+ * @brief 利用AT24C02存储电机总角度
+ * @param motor 电机实例指针
+ * @param total_angle 总角度值
+ */
+void DJIMotorSetTotalAngle(DJIMotorInstance *motor, float total_angle);
 #endif // !DJI_MOTOR_H

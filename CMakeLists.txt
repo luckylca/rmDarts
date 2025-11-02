@@ -15,6 +15,13 @@ set(CMAKE_AR arm-none-eabi-ar)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) 
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=unused-function")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=unused-function")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=unused-variable")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=unused-variable")
+
+
+
 # 指定工程名称和语言类型
 project(basic_framework C ASM) 
 

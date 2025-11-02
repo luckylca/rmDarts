@@ -6,18 +6,51 @@
         "usbd_cdc.h": "c",
         "usbd_conf.h": "c",
         "usbd_desc.h": "c",
-        "usbd_cdc_if.h": "c"
+        "usbd_cdc_if.h": "c",
+        "referee_task.h": "c",
+        "rm_referee.h": "c",
+        "memory.h": "c",
+        "string.h": "c",
+        "limits": "cpp",
+        "*.tcc": "cpp",
+        "crc16.h": "c",
+        "crc8.h": "c",
+        "kalman_filter.h": "c",
+        "main.h": "c",
+        "chassis.h": "c",
+        "bsp_dwt.h": "c",
+        "dmmotor.h": "c",
+        "stdint.h": "c",
+        "daemon.h": "c",
+        "cmsis_os.h": "c",
+        "user_lib.h": "c",
+        "gpio.h": "c",
+        "at24c02.h": "c",
+        "dji_motor.h": "c"
     },
-    "stm32-for-vscode.openOCDPath": false,
-    "stm32-for-vscode.makePath": false,
-    "stm32-for-vscode.armToolchainPath": false
-
-    //"terminal.integrated.defaultProfile.windows": "mysys2-mingw64", // 若希望为默认终端可以加入这一句
+    // "terminal.integrated.defaultProfile.windows": "mysys2-mingw64", // 若希望为默认终端可以加入这一句
     "terminal.integrated.profiles.windows": {
         "mysys2-mingw64": {
         "path": "cmd.exe", // 意思是使用cmd作为父进程启动终端
-        "args": ["/c","D:\\MSYS2\\msys2_shell.cmd -defterm -mingw64 -no-start -here"]
+        "args": ["C:\\msys64\\msys2_shell.cmd -defterm -mingw64 -no-start -here"]
             // msys2_shell.cmd在msys的安装目录下，这里要改为你自己的目录
         }
-  }
+},
+"makefile.makefilePath": "C:\\Users\\44300\\Desktop\\rm_bubing_base_quanxianglun\\Makefile",
+"C_Cpp.errorSquiggles": "enabled",
+"makefile.launchConfigurations": [
+    {
+        "cwd": "C:\\Users\\44300\\Desktop\\rm\\rm_bubing_base_quanxianglun\\build",
+        "binaryPath": "C:\\Users\\44300\\Desktop\rm\\rm_bubing_base_quanxianglun\\build\\basic_framework.elf",
+        "binaryArgs": []
+    }
+],
+"cortex-debug.openocdPath": "/opt/homebrew/bin/openocd",
+"cSpell.words": [
+    "coeffs"
+],
+"cortex-debug.armToolchainPath": "/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin",
+"stm32-for-vscode.openOCDPath": "/opt/homebrew/bin/openocd",
+"stm32-for-vscode.armToolchainPath": "/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin",
+"cortex-debug.variableUseNaturalFormat": false
 }

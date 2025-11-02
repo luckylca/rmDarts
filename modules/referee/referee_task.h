@@ -13,6 +13,9 @@ referee_info_t *UITaskInit(UART_HandleTypeDef *referee_usart_handle, Referee_Int
  * @brief 在referee task之前调用,添加在freertos.c中
  * 
  */
+
+referee_info_t *ReTaskInit(UART_HandleTypeDef *referee_usart_handle);
+
 void MyUIInit();
 
 /**

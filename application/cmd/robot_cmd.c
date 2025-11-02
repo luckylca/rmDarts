@@ -86,7 +86,7 @@ TickType_t startTime;
 // uart计数
 static int time = 0;
 static int last_time=RC_SW_DOWN;
-int yaw_control_servo = -118 + 180;
+int yaw_control_servo = 0;
 
 // 舵机机械臂完成标志位
 int flag_arm_sucess=0;
@@ -95,10 +95,16 @@ goal_of_dart goal = ANGLE_LOAD;
 
 extern int flag_3508_ready;
 extern bool flag_2006_back;
-int last_val = 0;
+extern int key;
+
 bool flag_init_goal = false;
+int flag=0;//全就位后选择发射
+int reload = 0;
+int reload_auto=1;
+int last_OP=0;
+int allow=0;//允许发射
 
-
+void Change_bottom_position(int num);
 
 struct Vision_angle
 {
@@ -136,28 +142,18 @@ void RobotCMDInit()
         .alarm_level = ALARM_LEVEL_HIGH, //设置警报等级 同一状态下 高等级的响应
         .loudness=  0.1, //设置响度
         .octave=  OCTAVE_4, // 设置音阶
-    };
-
-    Servo_Init_Config_s banji_config ={
-        .pwm_init_config={
-            .htim=&htim1,
-            .dutyratio=0.065,
-            .channel=TIM_CHANNEL_2,
-            .period=0.02,
-        },
-        .servo_type=PWM_Servo,
-    };
-    arm_motor= ServoInit(&banji_config);     
+    };  
 
     remot_alarm = BuzzerRegister(&buzzer_config);
 
 
     rc_data = RemoteControlInit(&huart3);   // 修改为对应串口,注意如果是自研板dbus协议串口需选用添加了反相器的那个
+
     F_data = F_Init(&huart6);
 
-    vision_recv_data = VisionInit(&huart1); // 视觉通信串口
+    vision_recv_data = VisionInit(&huart1); // 视觉通信串口，这个不实际占用串口
     
-    imageRoad_data = ImageRoadTaskInit(&huart1);
+    // imageRoad_data = ImageRoadTaskInit(&huart1);
 
     Vision_angle.pitch = 0;
     Vision_angle.yaw = 0;
@@ -205,47 +201,78 @@ static void CalcOffsetAngle()
  */
 static void RemoteControlSet()
 {
+    //左往上拨换弹一次
+    // if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_OP != RC_SW_UP){
+    //     reload=1;
+    // }
+    // last_OP=rc_data[TEMP].rc.switch_left;
+
+
     // 控制底盘和云台运行模式,云台待添加,云台是否始终使用IMU数据?
     if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 
     {
         chassis_cmd_send.chassis_mode = OPEN_3508;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
-        shoot_cmd_send.load_mode = LOAD_NORMAL;
+        // shoot_cmd_send.load_mode = LOAD_NORMAL;
+        shoot_cmd_send.load_mode = TEST;
+        // 左往上拨换弹一次
+        if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_OP != RC_SW_UP){
+            reload=1;
+        }
+        last_OP=rc_data[TEMP].rc.switch_left;
         
-
-        if(rc_data[TEMP].rc.rocker_r_>200)
-        { 
-            shoot_cmd_send.shoot_rate =20000;
-        }
-        else if(rc_data[TEMP].rc.rocker_r_<-200)
-        {
-            shoot_cmd_send.shoot_rate =-20000;
-        }
-        else
-            shoot_cmd_send.shoot_rate = 0;
-
-        // shoot_cmd_send.shoot_rate += 0.1f * (float)rc_data[TEMP].rc.rocker_r_;    //参数  要改
+        shoot_cmd_send.shoot_rate = 60.0f * (float)rc_data[TEMP].rc.rocker_l1;    //参数  要改
         chassis_cmd_send.v1 = 30.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
+        // chassis_cmd_send.v1 = 500;
     }
     else if (switch_is_down(rc_data[TEMP].rc.switch_right)) // 
     {
         chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
-        gimbal_cmd_send.gimbal_mode = AUTO_DART;
+        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
         shoot_cmd_send.banji_mode = BANJI_OFF;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
         shoot_cmd_send.load_mode = LOAD_STOP;
     }
     else if (switch_is_up(rc_data[TEMP].rc.switch_right))
     {
-        chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
+        // chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
+        chassis_cmd_send.chassis_mode = OPEN_3508;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
-        shoot_cmd_send.load_mode = AUTO_LOAD;
+        // shoot_cmd_send.load_mode = AUTO_LOAD;
+        shoot_cmd_send.load_mode = TEST;
+        //初始化2006
         if(flag_init_goal==false)
         {
             goal = ANGLE_LOAD;
             flag_init_goal = true;
         }
-        
+
+        //裁判系统接受的数据
+        int res=referee_info->DartInfo.dart_info/64%4;
+        //手动测试
+        // if(key==3||key==2){
+        //     goal=ANGLE_16M;
+        // }
+        // else if(key==1||key==4){
+        //     goal=ANGLE_25M;
+        // }        
+        //2006归位且换弹未完成可更换发射目标
+        if(flag_2006_back&&!flag_arm_sucess){
+            //裁判系统更改
+            if(res==1||res==0){
+                goal=ANGLE_16M;     //前哨站
+            }
+            else if(res==2||res==3){
+                goal=ANGLE_16M;     //基地固定or随机
+            }
+        }
+        //发射站状态
+        if(referee_info->DartCmd.dart_launch_opening_status==0){
+            allow=1;
+        }
+        else{
+            allow=0;
+        }
 
         if(rc_data[TEMP].rc.rocker_r_>200)
         { 
@@ -263,15 +290,21 @@ static void RemoteControlSet()
     }
 
 
-
     if(switch_is_up(rc_data[TEMP].rc.switch_right))
     {
         shoot_cmd_send.banji_mode = BANJI_ON_AUTO;
+        //自动时控制发射
+        if(rc_data[TEMP].rc.dial > 0){
+            flag=1;
+        }
+        else{
+            flag=0;
+        }
     }
     else if (rc_data[TEMP].rc.dial > 0 )// 拨轮打开发射
     {
 
-            shoot_cmd_send.banji_mode = BANJI_ON;
+        shoot_cmd_send.banji_mode = BANJI_ON;
     }
     else
     {
@@ -283,13 +316,14 @@ static void RemoteControlSet()
     // 云台参数,确定云台控制数据
     if (switch_is_mid(rc_data[TEMP].rc.switch_left)) // 
     {   
-        gimbal_cmd_send.gimbal_mode = TWO_YAW;
-        gimbal_cmd_send.yaw += 0.001f * (float)rc_data[TEMP].rc.rocker_l_;
-        gimbal_cmd_send.bottom += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
-
-        if(gimbal_cmd_send.yaw>50)
+        if(rc_data[TEMP].rc.rocker_l1==-660)
         {
-            gimbal_cmd_send.yaw=50;
+            gimbal_cmd_send.gimbal_mode = AUTO_DART;
+        }
+        else gimbal_cmd_send.gimbal_mode = TWO_YAW;
+        if(gimbal_cmd_send.yaw>30)
+        {
+            gimbal_cmd_send.yaw=30;
         }
         else if (gimbal_cmd_send.yaw<-50)
         {
@@ -304,6 +338,25 @@ static void RemoteControlSet()
         {
             gimbal_cmd_send.bottom=-30;
         }
+        gimbal_cmd_send.yaw += 0.001f * (float)rc_data[TEMP].rc.rocker_l_;
+        // gimbal_cmd_send.bottom += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
+
+        // if(rc_data[TEMP].rc.rocker_l_>400)
+        // {
+        //     Change_bottom_position(25);
+        // }
+        // else if(rc_data[TEMP].rc.rocker_l_<-400)
+        // {
+        //     Change_bottom_position(16);
+        // }
+        // else
+        // {
+        //     Change_bottom_position(0);
+        // }
+        
+        // gimbal_cmd_send.yaw = yaw_control_servo;
+        
+
 
     }
 
@@ -385,7 +438,7 @@ static void EmergencyHandler()
     { 
         
         alarm_count++;
-        gimbal_cmd_send.gimbal_mode = AUTO_DART;
+        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
         chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
         shoot_cmd_send.banji_mode = BANJI_OFF;
@@ -445,371 +498,366 @@ void Change_bottom_position(int num)
 {
     switch(num)
     {
-        case 1:
-            yaw_control_servo = -148 + 180;  
+        case 0:
+            yaw_control_servo = 0;  
             break;
-        case 2:
-            yaw_control_servo = -92 + 180;  
+        case 16:
+            yaw_control_servo = 12;  
             break;
-        case 3:
-            yaw_control_servo = -162 + 170;  
+        case 25:
+            yaw_control_servo = -45;  
             break;
-        case 4:
-            yaw_control_servo = -67 + 180;  
-            break;
-        case 5:
-            yaw_control_servo = -119 + 180;
         default:
             break;
     }
 }
 
-// 0.025-0.125
+// // 0.025-0.125
 
-void arm_up_claw_open()
-{
-    ServoSetAngle(arm_motor,0.105);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0000!", 16);    
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1250T0100!", 16);
-    DWT_Delay(0.5);
-}
+// void arm_up_claw_open()
+// {
+//     ServoSetAngle(arm_motor,0.105);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0000!", 16);    
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1250T0100!", 16);
+//     DWT_Delay(0.5);
+// }
 
-void claw_open_arm_up()
-{
-    ServoSetAngle(arm_motor,0.105);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1250T0100!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0100!", 16);
-    DWT_Delay(0.5);
+// void claw_open_arm_up()
+// {
+//     ServoSetAngle(arm_motor,0.105);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1250T0100!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0100!", 16);
+//     DWT_Delay(0.5);
 
-}
+// }
 
-void arm_up_claw_close()
-{
-    ServoSetAngle(arm_motor,0.105);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0000!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
-    DWT_Delay(0.5);
+// void arm_up_claw_close()
+// {
+//     ServoSetAngle(arm_motor,0.105);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0000!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
+//     DWT_Delay(0.5);
 
-}
+// }
 
-void arm_down_claw_open_1()
-{
-    ServoSetAngle(arm_motor,0.0822);     //
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1370T0100!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
-    DWT_Delay(0.5);
-}
-
-
-void arm_down_claw_close_1()
-{
-    ServoSetAngle(arm_motor,0.0822);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1370T0100!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
-    DWT_Delay(0.5);
-
-}
-
-void arm_down_claw_open_2()
-{
-    ServoSetAngle(arm_motor,0.084);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
-    DWT_Delay(0.5);
-}
+// void arm_down_claw_open_1()
+// {
+//     ServoSetAngle(arm_motor,0.0822);     //
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1370T0100!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
+//     DWT_Delay(0.5);
+// }
 
 
-void arm_down_claw_close_2()
-{
-    ServoSetAngle(arm_motor,0.084);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
-    DWT_Delay(0.5);
+// void arm_down_claw_close_1()
+// {
+//     ServoSetAngle(arm_motor,0.0822);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1370T0100!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
+//     DWT_Delay(0.5);
 
-}
+// }
 
-void arm_down_claw_open_3()
-{
-    ServoSetAngle(arm_motor,0.082);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
-    DWT_Delay(0.5);
-}
-
-
-void arm_down_claw_close_3()
-{
-    ServoSetAngle(arm_motor,0.082);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
-    DWT_Delay(0.5);
-
-}
-
-void arm_down_claw_open_4()
-{
-    ServoSetAngle(arm_motor,0.083);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1360T0100!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
-    DWT_Delay(0.5);
-}
+// void arm_down_claw_open_2()
+// {
+//     ServoSetAngle(arm_motor,0.084);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
+//     DWT_Delay(0.5);
+// }
 
 
-void arm_down_claw_close_4()
-{
-    ServoSetAngle(arm_motor,0.083);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1360T0100!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
-    DWT_Delay(0.5);
+// void arm_down_claw_close_2()
+// {
+//     ServoSetAngle(arm_motor,0.084);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
+//     DWT_Delay(0.5);
 
-}
+// }
 
-void arm_put_claw_open_1()
-{
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-    DWT_Delay(0.5);
-    ServoSetAngle(arm_motor,0.064);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
-    DWT_Delay(0.5);
-
-}
-
-void arm_put_claw_close_1()
-{
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0800T0150!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
-    DWT_Delay(0.5); 
-    ServoSetAngle(arm_motor,0.064);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-    DWT_Delay(0.5);
-
-}
-
-void arm_put_claw_open_2()
-{
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-    DWT_Delay(0.5);
-    ServoSetAngle(arm_motor,0.063);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
-    DWT_Delay(0.5);
-
-}
-
-void arm_put_claw_close_2()
-{
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0780T0150!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
-    DWT_Delay(0.5); 
-    ServoSetAngle(arm_motor,0.063);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-    DWT_Delay(0.5);
-
-}
-
-void arm_put_claw_open_3()
-{
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-    DWT_Delay(0.5);
-    ServoSetAngle(arm_motor,0.063);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
-    DWT_Delay(0.5);
-
-}
-
-void arm_put_claw_close_3()
-{
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0800T0150!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
-    DWT_Delay(0.5); 
-    ServoSetAngle(arm_motor,0.063);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-    DWT_Delay(0.5);
-
-}
-
-void arm_put_claw_open_4()
-{
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-    DWT_Delay(0.5);
-    ServoSetAngle(arm_motor,0.063);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
-    DWT_Delay(0.5);
-
-}
-
-void arm_put_claw_close_4()
-{
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0800T0150!", 16);
-    DWT_Delay(0.5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
-    DWT_Delay(0.5); 
-    ServoSetAngle(arm_motor,0.063);
-     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-    DWT_Delay(0.5);
-
-}
-void init_task(){
-    Change_bottom_position(5);
-    HAL_UART_Transmit_IT(&huart1, (uint8_t*)"{G0000#002P0900T0200!#001P0950T0050!}", 38);
-    ServoSetAngle(arm_motor,0.105);
-}
-
-void arm_task_4()
-{
-    Change_bottom_position(4);
-    arm_up_claw_open();
-    arm_down_claw_open_4();
-    arm_down_claw_close_4();
-    arm_up_claw_close();
-}
-
-void arm_task_3()
-{
-    Change_bottom_position(3);
-    arm_up_claw_open();
-    arm_down_claw_open_3();
-    arm_down_claw_close_3();
-    arm_up_claw_close();
-}
+// void arm_down_claw_open_3()
+// {
+//     ServoSetAngle(arm_motor,0.082);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
+//     DWT_Delay(0.5);
+// }
 
 
-void arm_task_1()
-{
-    Change_bottom_position(1);
-    arm_up_claw_open();
-    arm_down_claw_open_1();
-    arm_down_claw_close_1();
-    arm_up_claw_close();
-}
+// void arm_down_claw_close_3()
+// {
+//     ServoSetAngle(arm_motor,0.082);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
+//     DWT_Delay(0.5);
 
-void arm_task_2()
-{
-    Change_bottom_position(2);
-    arm_up_claw_open();
-    arm_down_claw_open_2();
-    arm_down_claw_close_2();
-    arm_up_claw_close();
-}
+// }
 
-void arm_task_11()
-{
-    Change_bottom_position(5);
-    arm_up_claw_close();
-    arm_put_claw_close_1();
-    arm_put_claw_open_1();
-    claw_open_arm_up();
-    arm_up_claw_close();
-}
-void arm_task_22()
-{
-    Change_bottom_position(5);
-    arm_up_claw_close();
-    arm_put_claw_close_2();
-    arm_put_claw_open_2();
-    claw_open_arm_up();
-    arm_up_claw_close();
-}
-void arm_task_33()
-{
-    Change_bottom_position(5);
-    arm_up_claw_close();
-    arm_put_claw_close_3();
-    arm_put_claw_open_3();
-    claw_open_arm_up();
-    arm_up_claw_close();
-}
-void arm_task_44()
-{
-    Change_bottom_position(5);
-    arm_up_claw_close();
-    arm_put_claw_close_4();
-    arm_put_claw_open_4();
-    claw_open_arm_up();
-    arm_up_claw_close();
-}
+// void arm_down_claw_open_4()
+// {
+//     ServoSetAngle(arm_motor,0.083);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1360T0100!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
+//     DWT_Delay(0.5);
+// }
 
-void uart1Task()
-{
-    // RemoteControl_outline_ALARM();
-if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP && flag_3508_ready == 1 && flag_2006_back == true && flag_arm_sucess == 0)// 左 侧开关状态[上],
-//    if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP)// 左 侧开关状态[上], 
-    {
-         switch (time)
-        {
-            case 0:
-                init_task();
-                time++;
-                break;
-            case 4:
-                arm_task_4();
-                arm_task_44();
-                time = 1;     
-                break;
-            case 3:
-                arm_task_3();
-                arm_task_33();
-                time++;      
-                break;
-            case 1:
-                arm_task_1();
-                arm_task_11();
-                time++;  
-                break;
-            case 2:
-                arm_task_2();
-                arm_task_22();
-                time++; 
-                break;
-            default:
-                break;
-        }
-        flag_arm_sucess = 1;
-        goal = ANGLE_16M;
-    }
-    last_time=rc_data[TEMP].rc.switch_left;
 
-}
+// void arm_down_claw_close_4()
+// {
+//     ServoSetAngle(arm_motor,0.083);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1360T0100!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
+//     DWT_Delay(0.5);
+
+// }
+
+// void arm_put_claw_open_1()
+// {
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
+//     DWT_Delay(0.5);
+//     ServoSetAngle(arm_motor,0.064);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
+//     DWT_Delay(0.5);
+
+// }
+
+// void arm_put_claw_close_1()
+// {
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0800T0150!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
+//     DWT_Delay(0.5); 
+//     ServoSetAngle(arm_motor,0.064);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
+//     DWT_Delay(0.5);
+
+// }
+
+// void arm_put_claw_open_2()
+// {
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
+//     DWT_Delay(0.5);
+//     ServoSetAngle(arm_motor,0.063);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
+//     DWT_Delay(0.5);
+
+// }
+
+// void arm_put_claw_close_2()
+// {
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0780T0150!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
+//     DWT_Delay(0.5); 
+//     ServoSetAngle(arm_motor,0.063);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
+//     DWT_Delay(0.5);
+
+// }
+
+// void arm_put_claw_open_3()
+// {
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
+//     DWT_Delay(0.5);
+//     ServoSetAngle(arm_motor,0.063);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
+//     DWT_Delay(0.5);
+
+// }
+
+// void arm_put_claw_close_3()
+// {
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0800T0150!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
+//     DWT_Delay(0.5); 
+//     ServoSetAngle(arm_motor,0.063);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
+//     DWT_Delay(0.5);
+
+// }
+
+// void arm_put_claw_open_4()
+// {
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
+//     DWT_Delay(0.5);
+//     ServoSetAngle(arm_motor,0.063);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
+//     DWT_Delay(0.5);
+
+// }
+
+// void arm_put_claw_close_4()
+// {
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0800T0150!", 16);
+//     DWT_Delay(0.5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
+//     DWT_Delay(0.5); 
+//     ServoSetAngle(arm_motor,0.063);
+//      HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
+//     DWT_Delay(0.5);
+
+// }
+// void init_task(){
+//     Change_bottom_position(5);
+//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"{G0000#002P0900T0200!#001P0950T0050!}", 38);
+//     ServoSetAngle(arm_motor,0.105);
+// }
+
+// void arm_task_4()
+// {
+//     Change_bottom_position(4);
+//     arm_up_claw_open();
+//     arm_down_claw_open_4();
+//     arm_down_claw_close_4();
+//     arm_up_claw_close();
+// }
+
+// void arm_task_3()
+// {
+//     Change_bottom_position(3);
+//     arm_up_claw_open();
+//     arm_down_claw_open_3();
+//     arm_down_claw_close_3();
+//     arm_up_claw_close();
+// }
+
+
+// void arm_task_1()
+// {
+//     Change_bottom_position(1);
+//     arm_up_claw_open();
+//     arm_down_claw_open_1();
+//     arm_down_claw_close_1();
+//     arm_up_claw_close();
+// }
+
+// void arm_task_2()
+// {
+//     Change_bottom_position(2);
+//     arm_up_claw_open();
+//     arm_down_claw_open_2();
+//     arm_down_claw_close_2();
+//     arm_up_claw_close();
+// }
+
+// void arm_task_11()
+// {
+//     Change_bottom_position(5);
+//     arm_up_claw_close();
+//     arm_put_claw_close_1();
+//     arm_put_claw_open_1();
+//     claw_open_arm_up();
+//     arm_up_claw_close();
+// }
+// void arm_task_22()
+// {
+//     Change_bottom_position(5);
+//     arm_up_claw_close();
+//     arm_put_claw_close_2();
+//     arm_put_claw_open_2();
+//     claw_open_arm_up();
+//     arm_up_claw_close();
+// }
+// void arm_task_33()
+// {
+//     Change_bottom_position(5);
+//     arm_up_claw_close();
+//     arm_put_claw_close_3();
+//     arm_put_claw_open_3();
+//     claw_open_arm_up();
+//     arm_up_claw_close();
+// }
+// void arm_task_44()
+// {
+//     Change_bottom_position(5);
+//     arm_up_claw_close();
+//     arm_put_claw_close_4();
+//     arm_put_claw_open_4();
+//     claw_open_arm_up();
+//     arm_up_claw_close();
+// }
+
+// void uart1Task()
+// {
+//     // RemoteControl_outline_ALARM();
+// if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP && flag_3508_ready == 1 && flag_2006_back == true && flag_arm_sucess == 0)// 左 侧开关状态[上],
+// //    if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP)// 左 侧开关状态[上], 
+//     {
+//          switch (time)
+//         {
+//             case 0:
+//                 init_task();
+//                 time++;
+//                 break;
+//             case 4:
+//                 arm_task_4();
+//                 arm_task_44();
+//                 time = 1;     
+//                 break;
+//             case 3:
+//                 arm_task_3();
+//                 arm_task_33();
+//                 time++;      
+//                 break;
+//             case 1:
+//                 arm_task_1();
+//                 arm_task_11();
+//                 time++;  
+//                 break;
+//             case 2:
+//                 arm_task_2();
+//                 arm_task_22();
+//                 time++; 
+//                 break;
+//             default:
+//                 break;
+//         }
+//         flag_arm_sucess = 1;
+//         goal = ANGLE_16M;
+//     }
+//     last_time=rc_data[TEMP].rc.switch_left;
+
+// }
 
 
 // 拉力传感器任务
 void uart6Task()
 {
      // RemoteControl_outline_ALARM();
-      // // 读取串口一的数据
+      // // 读取串口六的数据
     uint8_t data[4] = {0};
     if (HAL_UART_Receive(&huart6, data, 4, HAL_MAX_DELAY) == HAL_OK)
     {
             // 处理接收到的数据
-      
+    
             HAL_UART_Transmit_IT(&huart6, data, 4);
             
             // 调用你的处理函数

@@ -183,6 +183,12 @@ static void DJIMotorLostCallback(void *motor_ptr)
     LOGWARNING("[dji_motor] Motor lost, can bus [%d] , id [%d]", can_bus, motor->motor_can_instance->tx_id);
 }
 
+void DJIMotorSetTotalAngle(DJIMotorInstance *motor, float total_angle)
+{
+    DJI_Motor_Measure_s *measure = &motor->measure;
+    measure->total_angle = total_angle;
+    measure->total_round = (int32_t)(total_angle / 360.0f);
+}
 // 电机初始化,返回一个电机实例
 DJIMotorInstance *DJIMotorInit(Motor_Init_Config_s *config)
 {
@@ -193,6 +199,11 @@ DJIMotorInstance *DJIMotorInit(Motor_Init_Config_s *config)
     instance->motor_type = config->motor_type;
     instance->motor_settings = config->controller_setting_init_config;
 
+    if(config->motor_type == M2006)
+    {
+        instance->measure.total_angle = readDjiMotorTotalAngleSetByIndex(idx);
+        instance->measure.total_round = instance->measure.total_angle / 360.0f;
+    }
     // 初始化滤波器
     DJIMotorFilterInit(&instance->measure);
 
@@ -279,6 +290,10 @@ void DJIMotorControl()
         motor_setting = &motor->motor_settings;
         motor_controller = &motor->motor_controller;
         measure = &motor->measure;
+        if (motor->motor_type == M2006)
+        {
+            writeDjiMotorTotalAngleSetByIndex(i, (int32_t)(measure->total_angle)); // 存储电机总角度
+        }
         pid_ref = motor_controller->pid_ref; // 保存设定值,防止motor_controller->pid_ref在计算过程中被修改
         if (motor_setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)
             pid_ref *= -1; // 设置反转

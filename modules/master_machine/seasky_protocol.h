@@ -59,6 +59,17 @@ typedef struct
     uint8_t check_sum2;
 } RX_PACKET;
 
+// 添加单字节处理函数声明
+/**
+ * @brief 处理单个接收到的字节
+ * @param byte 接收到的字节
+ * @param buffer 存储字节的缓冲区
+ * @param index 当前缓冲区索引指针，会被更新
+ * @param buffer_size 缓冲区最大大小
+ * @return 1 表示缓冲区已满，0 表示缓冲区未满
+ */
+uint8_t process_single_byte(uint8_t byte, uint8_t *buffer, uint16_t *index, uint16_t buffer_size);
+
 /*更新发送数据帧，并计算发送数据帧长度*/
 void get_protocol_send_data(uint16_t send_id,		 // 信号id
 							uint16_t flags_register, // 16位寄存器

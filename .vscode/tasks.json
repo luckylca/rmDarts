@@ -1,45 +1,80 @@
 {
-    // See https://go.microsoft.com/fwlink/?LinkId=733558
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build task",         // 任务标签
-            "type": "shell",               // 任务类型,因为要调用mingw32-make,是在终端(CMD)里运行的,所以是shell任务
-            "command": "mingw32-make -j24",// 任务命令,线程数可以根据自己的电脑修改,建议与cpu核数相同
-            "problemMatcher": [],          
+            "label": "Build",
+            "type": "shell",
+            "command": "make -j$(sysctl -n hw.ncpu)",
+            "problemMatcher": ["$gcc"],
             "group": {
                 "kind": "build",
                 "isDefault": true
-            }
-        },
-        {
-            "label": "download dap",
-            "type": "shell",               // 如果希望在下载前编译,可以把command换成下面的命令
-            "command":"mingw32-make -j24 ; mingw32-make download_dap", // "mingw32-make -j24 ; mingw32-make download_dap",
-            "group": {                     // 如果没有修改代码,编译任务不会消耗时间,因此推荐使用上面的替换.
-                "kind": "build",
-                "isDefault": false,
             },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "detail": "Using GNU make with CPU core count"
         },
         {
-            "label": "download jlink", // 要使用此任务,需添加jlink的环境变量
+            "label": "Flash via Daplink",
             "type": "shell",
-            "command":"mingw32-make -j24 ; mingw32-make download_jlink", // "mingw32-make -j24 ; mingw32-make download_jlink"
-            "group": {
-                "kind": "build",
-                "isDefault": false,
-            }
+            "command": "make download_daplink",
+            "problemMatcher": ["$gcc"],
+            "group": "build",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "detail": "Flashes firmware using Daplink",
+            "dependsOn": "Build"
         },
         {
-            "label": "log",
+            "label": "Flash via Jlink",
             "type": "shell",
-            "command":"JlinkRTTClient",
-            "args": [],
+            "command": "make download_jlink",
+            "problemMatcher": ["$gcc"],
+            "group": "build",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "detail": "Flashes firmware using Jlink",
+            "dependsOn": "Build"
+        },
+        {
+            "label": "Start OpenOCD Server",
+            "type": "shell",
+            "command": "openocd -f /opt/homebrew/opt/open-ocd/share/openocd/scripts/interface/cmsis-dap.cfg -f /opt/homebrew/opt/open-ocd/share/openocd/scripts/target/stm32f4x.cfg",
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": [
+                    {
+                        "regexp": "^(.*)$",
+                        "file": 1,
+                        "location": 2,
+                        "message": 3
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Info : .+ Listening on port \\d+ for gdb connections",
+                    "endsPattern": "Info : .+ accepting 'telnet' connection"
+                }
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "detail": "Starts OpenOCD server for debugging"
+        },
+        {
+            "label": "RTT Log Viewer",
+            "type": "shell",
+            "command": "telnet localhost 4444",
             "problemMatcher": [],
-            // "dependsOn":[
-            //     "build task", // 可以添加多个.
-            // ]
-            // 若使用daplink,则将log任务设置为依赖于jlink launch任务,保证jlink launch任务先于log任务执行
+            "group": "test",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "detail": "Connects to OpenOCD RTT console",
+            "dependsOn": "Start OpenOCD Server"
         }
     ]
 }

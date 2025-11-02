@@ -14,9 +14,12 @@ static uint8_t rc_init_flag = 0; // 遥控器初始化标志位
 int16_t rc_cyy[6]; // 遥控器数据   
 // 拉力传感器数据
 double F_data_1; 
+double F_data_2;
 static uint8_t F_init_flag = 0; 
-static int32_t weight=0;
-static double  result=0;
+static int32_t weight1=0;
+static double  result1=0;
+static int32_t weight2=0;
+static double  result2=0;
 double temp=0;
 double adjusted_weight=0;
 // 遥控器拥有的串口实例,因为遥控器是单例,所以这里只有一个,就不封装了
@@ -181,7 +184,8 @@ static void sbus_to_rc_cyy(const uint8_t *sbus_buf)
 static void RemoteControlRxCallback()
 {
     DaemonReload(rc_daemon_instance);         // 先喂狗
-    sbus_to_rc_cyy(rc_usart_instance->recv_buff); // 进行协议解析
+    // sbus_to_rc_cyy(rc_usart_instance->recv_buff); // 进行协议解析
+    sbus_to_rc(rc_usart_instance->recv_buff);
 }
 
 /**
@@ -285,10 +289,13 @@ double decode_status(uint8_t X6, int32_t weight)
 
 static void f_data_slove(const uint8_t *F_data_buf)
 {
-    weight = decode_weight(F_data_buf[2],F_data_buf[3],F_data_buf[4],F_data_buf[5],F_data_buf[6]);
-    result = decode_status(F_data_buf[7], weight); 
-    
-    F_data_1 = result;
+    weight1 = decode_weight(F_data_buf[2],F_data_buf[3],F_data_buf[4],F_data_buf[5],F_data_buf[6]);
+    result1 = decode_status(F_data_buf[7], weight1); 
+    F_data_1 = result1;
+
+    weight2 = decode_weight(F_data_buf[10],F_data_buf[11],F_data_buf[12],F_data_buf[13],F_data_buf[14]);
+    result2 = decode_status(F_data_buf[15], weight2);
+    F_data_2 = result2;
 }
 
 /**
@@ -308,6 +315,7 @@ static void F_RxCallback()
 static void FLostCallback(void *id)
 {
     F_data_1 = 0; // 清空拉力传感器数据
+    F_data_2 = 0;
     HAL_UART_Transmit(&huart6, rs485buf, 5, 1000);
     USARTServiceInit(F_usart_instance); // 尝试重新启动接收
     LOGWARNING("[F] remote control lost");

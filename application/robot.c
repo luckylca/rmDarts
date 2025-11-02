@@ -30,20 +30,20 @@ void RobotInit()
     BSPInit();
 
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
-    RobotCMDInit();
-    GimbalInit();
-    ShootInit();
+    RobotCMDInit();//初始化扳机
+    GimbalInit();//yaw 轴初始化
+    ShootInit();//初始化扳机加上龙门架的 2006
 #endif
 
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
-    ChassisInit();
+    ChassisInit();//拉簧电机初始化 3508
 #endif
 
     OSTaskInit(); // 创建基础任务
 
     // 初始化完成,开启中断
     __enable_irq();
-    HAL_UART_Transmit(&huart6, rs485buf, 5, 1000);
+    HAL_UART_Transmit(&huart1, rs485buf, 5, 1000);
 }
 
 void RobotTask()

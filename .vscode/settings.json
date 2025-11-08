@@ -26,7 +26,14 @@
         "user_lib.h": "c",
         "gpio.h": "c",
         "at24c02.h": "c",
-        "dji_motor.h": "c"
+        "dji_motor.h": "c",
+        "bsp_can.h": "c",
+        "stm32f4xx_hal_can.h": "c",
+        "encoder.h": "c",
+        "typeinfo": "c",
+        "motor_task.h": "c",
+        "encoder_task.h": "c",
+        "robot_task.h": "c"
     },
     // "terminal.integrated.defaultProfile.windows": "mysys2-mingw64", // 若希望为默认终端可以加入这一句
     "terminal.integrated.profiles.windows": {

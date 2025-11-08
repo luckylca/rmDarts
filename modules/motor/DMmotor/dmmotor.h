@@ -12,8 +12,8 @@
 #define DM_P_MAX  12.5f
 #define DM_V_MIN  (-45.0f)
 #define DM_V_MAX  45.0f
-#define DM_T_MIN  (-18.0f)
-#define DM_T_MAX   18.0f
+#define DM_T_MIN  (-10.0f)
+#define DM_T_MAX   10.0f
 
 typedef struct 
 {
@@ -81,4 +81,5 @@ void DMMotorEnable(DMMotorInstance *motor);
 void DMMotorStop(DMMotorInstance *motor);
 void DMMotorCaliEncoder(DMMotorInstance *motor);
 void DMMotorControlInit();
+
 #endif // !DMMOTOR

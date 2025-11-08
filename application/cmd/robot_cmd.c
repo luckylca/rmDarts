@@ -13,7 +13,7 @@
 #include "referee_protocol.h"
 #include "referee_task.h"
 #include "imageRoad.h"
-
+#include "at24c02.h"
 #include "servo_motor.h"
 // bsp
 #include "bsp_dwt.h"
@@ -40,7 +40,7 @@ static CANCommInstance *cmd_can_comm; // 双板通信
 static Publisher_t *chassis_cmd_pub;   // 底盘控制消息发布者
 static Subscriber_t *chassis_feed_sub; // 底盘反馈信息订阅者
 #endif                                 // ONE_BOARD
-
+UART_HandleTypeDef huart2;
 static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信息,包括控制信息和UI绘制相关
 static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息,底盘功率枪口热量与底盘运动状态等
 
@@ -132,8 +132,6 @@ float forward_feed(float in)
    return out;
 }
 
-
-
 void RobotCMDInit()
 {
 
@@ -151,8 +149,10 @@ void RobotCMDInit()
 
     F_data = F_Init(&huart6);
 
-    vision_recv_data = VisionInit(&huart1); // 视觉通信串口，这个不实际占用串口
+    vision_recv_data = VisionInit(&huart2); // 视觉通信串口，这个不实际占用串口
+    // setAllMotorZero();
     
+    readAllMotorAngle(); // 从EEPROM加载所有电机总角度数据
     // imageRoad_data = ImageRoadTaskInit(&huart1);
 
     Vision_angle.pitch = 0;
@@ -201,13 +201,6 @@ static void CalcOffsetAngle()
  */
 static void RemoteControlSet()
 {
-    //左往上拨换弹一次
-    // if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_OP != RC_SW_UP){
-    //     reload=1;
-    // }
-    // last_OP=rc_data[TEMP].rc.switch_left;
-
-
     // 控制底盘和云台运行模式,云台待添加,云台是否始终使用IMU数据?
     if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 
     {
@@ -490,363 +483,6 @@ void RobotCMDTask()
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
     PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
 }
-
-
-// 以下为机械臂控制代码
-
-void Change_bottom_position(int num)
-{
-    switch(num)
-    {
-        case 0:
-            yaw_control_servo = 0;  
-            break;
-        case 16:
-            yaw_control_servo = 12;  
-            break;
-        case 25:
-            yaw_control_servo = -45;  
-            break;
-        default:
-            break;
-    }
-}
-
-// // 0.025-0.125
-
-// void arm_up_claw_open()
-// {
-//     ServoSetAngle(arm_motor,0.105);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0000!", 16);    
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1250T0100!", 16);
-//     DWT_Delay(0.5);
-// }
-
-// void claw_open_arm_up()
-// {
-//     ServoSetAngle(arm_motor,0.105);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1250T0100!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0100!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_up_claw_close()
-// {
-//     ServoSetAngle(arm_motor,0.105);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0000!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_down_claw_open_1()
-// {
-//     ServoSetAngle(arm_motor,0.0822);     //
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1370T0100!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
-//     DWT_Delay(0.5);
-// }
-
-
-// void arm_down_claw_close_1()
-// {
-//     ServoSetAngle(arm_motor,0.0822);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1370T0100!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_down_claw_open_2()
-// {
-//     ServoSetAngle(arm_motor,0.084);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
-//     DWT_Delay(0.5);
-// }
-
-
-// void arm_down_claw_close_2()
-// {
-//     ServoSetAngle(arm_motor,0.084);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_down_claw_open_3()
-// {
-//     ServoSetAngle(arm_motor,0.082);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
-//     DWT_Delay(0.5);
-// }
-
-
-// void arm_down_claw_close_3()
-// {
-//     ServoSetAngle(arm_motor,0.082);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1330T0100!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_down_claw_open_4()
-// {
-//     ServoSetAngle(arm_motor,0.083);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1360T0100!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1230T0100!", 16);
-//     DWT_Delay(0.5);
-// }
-
-
-// void arm_down_claw_close_4()
-// {
-//     ServoSetAngle(arm_motor,0.083);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1360T0100!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0900T0100!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_put_claw_open_1()
-// {
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-//     DWT_Delay(0.5);
-//     ServoSetAngle(arm_motor,0.064);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_put_claw_close_1()
-// {
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0800T0150!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
-//     DWT_Delay(0.5); 
-//     ServoSetAngle(arm_motor,0.064);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_put_claw_open_2()
-// {
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-//     DWT_Delay(0.5);
-//     ServoSetAngle(arm_motor,0.063);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_put_claw_close_2()
-// {
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0780T0150!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
-//     DWT_Delay(0.5); 
-//     ServoSetAngle(arm_motor,0.063);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_put_claw_open_3()
-// {
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-//     DWT_Delay(0.5);
-//     ServoSetAngle(arm_motor,0.063);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_put_claw_close_3()
-// {
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0800T0150!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
-//     DWT_Delay(0.5); 
-//     ServoSetAngle(arm_motor,0.063);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_put_claw_open_4()
-// {
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-//     DWT_Delay(0.5);
-//     ServoSetAngle(arm_motor,0.063);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P1300T0200!", 16);
-//     DWT_Delay(0.5);
-
-// }
-
-// void arm_put_claw_close_4()
-// {
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P0800T0150!", 16);
-//     DWT_Delay(0.5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#002P0880T0200!", 16);
-//     DWT_Delay(0.5); 
-//     ServoSetAngle(arm_motor,0.063);
-//      HAL_UART_Transmit_IT(&huart1, (uint8_t*)"#001P1100T0150!", 16);
-//     DWT_Delay(0.5);
-
-// }
-// void init_task(){
-//     Change_bottom_position(5);
-//     HAL_UART_Transmit_IT(&huart1, (uint8_t*)"{G0000#002P0900T0200!#001P0950T0050!}", 38);
-//     ServoSetAngle(arm_motor,0.105);
-// }
-
-// void arm_task_4()
-// {
-//     Change_bottom_position(4);
-//     arm_up_claw_open();
-//     arm_down_claw_open_4();
-//     arm_down_claw_close_4();
-//     arm_up_claw_close();
-// }
-
-// void arm_task_3()
-// {
-//     Change_bottom_position(3);
-//     arm_up_claw_open();
-//     arm_down_claw_open_3();
-//     arm_down_claw_close_3();
-//     arm_up_claw_close();
-// }
-
-
-// void arm_task_1()
-// {
-//     Change_bottom_position(1);
-//     arm_up_claw_open();
-//     arm_down_claw_open_1();
-//     arm_down_claw_close_1();
-//     arm_up_claw_close();
-// }
-
-// void arm_task_2()
-// {
-//     Change_bottom_position(2);
-//     arm_up_claw_open();
-//     arm_down_claw_open_2();
-//     arm_down_claw_close_2();
-//     arm_up_claw_close();
-// }
-
-// void arm_task_11()
-// {
-//     Change_bottom_position(5);
-//     arm_up_claw_close();
-//     arm_put_claw_close_1();
-//     arm_put_claw_open_1();
-//     claw_open_arm_up();
-//     arm_up_claw_close();
-// }
-// void arm_task_22()
-// {
-//     Change_bottom_position(5);
-//     arm_up_claw_close();
-//     arm_put_claw_close_2();
-//     arm_put_claw_open_2();
-//     claw_open_arm_up();
-//     arm_up_claw_close();
-// }
-// void arm_task_33()
-// {
-//     Change_bottom_position(5);
-//     arm_up_claw_close();
-//     arm_put_claw_close_3();
-//     arm_put_claw_open_3();
-//     claw_open_arm_up();
-//     arm_up_claw_close();
-// }
-// void arm_task_44()
-// {
-//     Change_bottom_position(5);
-//     arm_up_claw_close();
-//     arm_put_claw_close_4();
-//     arm_put_claw_open_4();
-//     claw_open_arm_up();
-//     arm_up_claw_close();
-// }
-
-// void uart1Task()
-// {
-//     // RemoteControl_outline_ALARM();
-// if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP && flag_3508_ready == 1 && flag_2006_back == true && flag_arm_sucess == 0)// 左 侧开关状态[上],
-// //    if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_time != RC_SW_UP)// 左 侧开关状态[上], 
-//     {
-//          switch (time)
-//         {
-//             case 0:
-//                 init_task();
-//                 time++;
-//                 break;
-//             case 4:
-//                 arm_task_4();
-//                 arm_task_44();
-//                 time = 1;     
-//                 break;
-//             case 3:
-//                 arm_task_3();
-//                 arm_task_33();
-//                 time++;      
-//                 break;
-//             case 1:
-//                 arm_task_1();
-//                 arm_task_11();
-//                 time++;  
-//                 break;
-//             case 2:
-//                 arm_task_2();
-//                 arm_task_22();
-//                 time++; 
-//                 break;
-//             default:
-//                 break;
-//         }
-//         flag_arm_sucess = 1;
-//         goal = ANGLE_16M;
-//     }
-//     last_time=rc_data[TEMP].rc.switch_left;
-
-// }
-
 
 // 拉力传感器任务
 void uart6Task()

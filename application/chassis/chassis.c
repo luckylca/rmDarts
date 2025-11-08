@@ -100,108 +100,45 @@ float v = -4000;  //转动速度
 void ChassisInit()
 {
     // 四个轮子的参数一样,改tx_id和反转标志位即可
-    // Motor_Init_Config_s chassis_motor_config = {
-    //     .can_init_config.can_handle = &hcan2,
-    //     .controller_param_init_config = {
-    //         .speed_PID = {
-    //             .Kp = 4.5, // 4.5
-    //             .Ki = 0,  // 0
-    //             .Kd = 0.0001,  // 0
-    //             .IntegralLimit = 3000,
-    //             .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-    //             .MaxOut = 12000,
-    //         },
-    //         .current_PID = {
-    //             .Kp = 1, // 0.4
-    //             .Ki = 0,   // 0
-    //             .Kd = 0,
-    //             .IntegralLimit = 3000,
-    //             .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-    //             .MaxOut = 15000,
-    //         },
-    //     },
-    //     .controller_setting_init_config = {
-    //         .angle_feedback_source = MOTOR_FEED,
-    //         .speed_feedback_source = MOTOR_FEED,
-    //         .outer_loop_type = SPEED_LOOP,
-    //         .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
-    //     },
-    //     .motor_type = M3508,
-    // };
-    // //  @todo: 当前还没有设置电机的正反转,仍然需要手动添加reference的正负号,需要电机module的支持,待修改.
-    // chassis_motor_config.can_init_config.tx_id = 1;//4;
-    // chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
-    // motor_lf = DJIMotorInit(&chassis_motor_config);
+    Motor_Init_Config_s chassis_motor_config = {
+        .can_init_config.can_handle = &hcan2,
+        .controller_param_init_config = {
+            .speed_PID = {
+                .Kp = 1.5, // 4.5
+                .Ki = 0,  // 0
+                .Kd = 0.0001,  // 0
+                .IntegralLimit = 3000,
+                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+                .MaxOut = 12000,
+            },
+            .current_PID = {
+                .Kp = 1, // 0.4
+                .Ki = 0,   // 0
+                .Kd = 0,
+                .IntegralLimit = 3000,
+                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+                .MaxOut = 15000,
+            },
+        },
+        .controller_setting_init_config = {
+            .angle_feedback_source = MOTOR_FEED,
+            .speed_feedback_source = MOTOR_FEED,
+            .outer_loop_type = SPEED_LOOP,
+            .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
+        },
+        .motor_type = M3508,
+    };
+    //  @todo: 当前还没有设置电机的正反转,仍然需要手动添加reference的正负号,需要电机module的支持,待修改.
+    chassis_motor_config.can_init_config.tx_id = 1;//4;
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
+    motor_lf = DJIMotorInit(&chassis_motor_config);
 
-    // chassis_motor_config.can_init_config.tx_id = 2;//;
-    // chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;//
-    // motor_rf = DJIMotorInit(&chassis_motor_config);
-Motor_Init_Config_s chassis_motor_config1 = {
-        .can_init_config.can_handle = &hcan2,
-        .controller_param_init_config = {
-            .speed_PID = {
-                .Kp = 1.5, // 4.5
-                .Ki = 0,  // 0
-                .Kd = 0.0001,  // 0
-                .IntegralLimit = 3000,
-                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-                .MaxOut = 12000,
-            },
-            .current_PID = {
-                .Kp = 1, // 0.4
-                .Ki = 0,   // 0
-                .Kd = 0,
-                .IntegralLimit = 3000,
-                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-                .MaxOut = 15000,
-            },
-        },
-        .controller_setting_init_config = {
-            .angle_feedback_source = MOTOR_FEED,
-            .speed_feedback_source = MOTOR_FEED,
-            .outer_loop_type = SPEED_LOOP,
-            .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
-        },
-        .motor_type = M3508,
-        
-        .can_init_config.tx_id = 1,
-        .controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE,
-    };
-    motor_lf = DJIMotorInit(&chassis_motor_config1);
-Motor_Init_Config_s chassis_motor_config2 = {
-        .can_init_config.can_handle = &hcan2,
-        .controller_param_init_config = {
-            .speed_PID = {
-                .Kp = 1.5, // 4.5
-                .Ki = 0,  // 0
-                .Kd = 0.0001,  // 0
-                .IntegralLimit = 3000,
-                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-                .MaxOut = 12000,
-            },
-            .current_PID = {
-                .Kp = 1, // 0.4
-                .Ki = 0,   // 0
-                .Kd = 0,
-                .IntegralLimit = 3000,
-                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-                .MaxOut = 15000,
-            },
-        },
-        .controller_setting_init_config = {
-            .angle_feedback_source = MOTOR_FEED,
-            .speed_feedback_source = MOTOR_FEED,
-            .outer_loop_type = SPEED_LOOP,
-            .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
-        },
-        .motor_type = M3508,
-        .can_init_config.tx_id = 2,
-        .controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
-    };
-    motor_rf = DJIMotorInit(&chassis_motor_config2);
+    chassis_motor_config.can_init_config.tx_id = 2;//;
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;//
+    motor_rf = DJIMotorInit(&chassis_motor_config);
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
     // referee_data = UITaskInit(&huart6,&ui_data); // 裁判系统初始化,会同时初始化UI
-    referee_data = ReTaskInit(&huart6); // 裁判系统初始化
+    referee_data = ReTaskInit(&huart1); // 裁判系统初始化
 #endif 
 
 

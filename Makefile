@@ -129,6 +129,8 @@ modules/bluetooth/HC05.c \
 modules/BMI088/bmi088.c \
 modules/imu/BMI088driver.c \
 modules/imu/BMI088Middleware.c \
+modules/encoder/encoder_task.c \
+modules/encoder/encoder.c \
 modules/imu/ins_task.c \
 modules/ist8310/ist8310.c \
 modules/master_machine/master_process.c \
@@ -255,6 +257,7 @@ C_INCLUDES =  \
 -Imodules/at24c02 \
 -Imodules/bluetooth \
 -Imodules/BMI088 \
+-Imodules/encoder \
 -Imodules/imu \
 -Imodules/ist8310 \
 -Imodules/master_machine \

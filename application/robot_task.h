@@ -18,10 +18,12 @@
 #include "remote_control.h"
 #include "bsp_log.h"
 #include "robot_cmd.h" 
+#include "encoder_task.h"
 
 osThreadId insTaskHandle;
 osThreadId robotTaskHandle;
 osThreadId motorTaskHandle;
+osThreadId encoderTaskHandle;
 osThreadId daemonTaskHandle;
 osThreadId uiTaskHandle;
 osThreadId uart1TaskHandle;
@@ -29,6 +31,7 @@ osThreadId uart6TaskHandle;
 
 void StartINSTASK(void const *argument);
 void StartMOTORTASK(void const *argument);
+void StartENCODERTASK(void const *argument);
 void StartDAEMONTASK(void const *argument);
 void StartROBOTTASK(void const *argument);
 void StartUITASK(void const *argument);
@@ -56,6 +59,8 @@ void OSTaskInit()
     osThreadDef(robottask, StartROBOTTASK, osPriorityNormal, 0, 1024);
     robotTaskHandle = osThreadCreate(osThread(robottask), NULL);
 
+    osThreadDef(encodertask, StartENCODERTASK, osPriorityNormal, 0, 128);
+    encoderTaskHandle = osThreadCreate(osThread(encodertask), NULL);
     // 因为要用串口六测试，先把ui禁止了
     // osThreadDef(uitask, StartUITASK, osPriorityNormal, 0, 512);
     // uiTaskHandle = osThreadCreate(osThread(uitask), NULL);
@@ -138,6 +143,23 @@ __attribute__((noreturn)) void StartROBOTTASK(void const *argument)
         robot_dt = DWT_GetTimeline_ms() - robot_start;
         if (robot_dt > 5)
             LOGERROR("[freeRTOS] ROBOT core Task is being DELAY! dt = [%f]", &robot_dt);
+        osDelay(5);
+    }
+}
+
+__attribute__((noreturn)) void StartENCODERTASK(void const *argument)
+{
+    static float encoder_dt;
+    static float encoder_start;
+    LOGINFO("[freeRTOS] ENCODER Task Start");
+    // 200Hz-500Hz,若有额外的控制任务如平衡步兵可能需要提升至1kHz
+    for (;;)
+    {
+        encoder_start = DWT_GetTimeline_ms();
+        EncoderTask();
+        encoder_dt = DWT_GetTimeline_ms() - encoder_start;
+        if (encoder_dt > 5)
+            LOGERROR("[freeRTOS] ENCODER Task is being DELAY! dt = [%f]", &encoder_dt);
         osDelay(5);
     }
 }

@@ -37,6 +37,7 @@
 /* USER CODE BEGIN Includes */
 #include "robot.h"
 #include "bsp_log.h"
+#include "at24c02.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +47,80 @@ int _write(int file, char *ptr, int len)
     // 将一个字符串通过 UART1 发送出去
     HAL_UART_Transmit(&huart1, (uint8_t *)ptr, len, HAL_MAX_DELAY);
     return len;
+}
+static void DebugFreeze_Init(void)
+{
+    /* F4 通常不需要给 DBGMCU 额外开时钟，没有该宏也没关系 */
+    #if defined(__HAL_RCC_DBGMCU_CLK_ENABLE)
+    __HAL_RCC_DBGMCU_CLK_ENABLE();
+    #endif
+
+    /* --- 定时器冻结（按需保留/都留也行，有宏才会编译） --- */
+    #ifdef __HAL_DBGMCU_FREEZE_TIM1
+    __HAL_DBGMCU_FREEZE_TIM1();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_TIM8
+    __HAL_DBGMCU_FREEZE_TIM8();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_TIM2
+    __HAL_DBGMCU_FREEZE_TIM2();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_TIM3
+    __HAL_DBGMCU_FREEZE_TIM3();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_TIM4
+    __HAL_DBGMCU_FREEZE_TIM4();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_TIM5
+    __HAL_DBGMCU_FREEZE_TIM5();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_TIM6
+    __HAL_DBGMCU_FREEZE_TIM6();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_TIM7
+    __HAL_DBGMCU_FREEZE_TIM7();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_TIM12
+    __HAL_DBGMCU_FREEZE_TIM12();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_TIM13
+    __HAL_DBGMCU_FREEZE_TIM13();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_TIM14
+    __HAL_DBGMCU_FREEZE_TIM14();
+    #endif
+
+    /* --- 看门狗冻结 --- */
+    #ifdef __HAL_DBGMCU_FREEZE_IWDG
+    __HAL_DBGMCU_FREEZE_IWDG();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_WWDG
+    __HAL_DBGMCU_FREEZE_WWDG();
+    #endif
+
+    /* --- I2C 超时（有就冻，没有就跳过）--- */
+    #ifdef __HAL_DBGMCU_FREEZE_I2C1_TIMEOUT
+    __HAL_DBGMCU_FREEZE_I2C1_TIMEOUT();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_I2C2_TIMEOUT
+    __HAL_DBGMCU_FREEZE_I2C2_TIMEOUT();
+    #endif
+    #ifdef __HAL_DBGMCU_FREEZE_I2C3_TIMEOUT
+    __HAL_DBGMCU_FREEZE_I2C3_TIMEOUT();
+    #endif
+
+    /* --- CAN1/2 冻结（F4 有寄存器位；有 HAL 宏用宏，没宏用寄存器位） --- */
+    #ifdef __HAL_DBGMCU_FREEZE_CAN1
+    __HAL_DBGMCU_FREEZE_CAN1();
+    #elif defined(DBGMCU_APB1_FZ_DBG_CAN1_STOP)
+    DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_CAN1_STOP;
+    #endif
+
+    #ifdef __HAL_DBGMCU_FREEZE_CAN2
+    __HAL_DBGMCU_FREEZE_CAN2();
+    #elif defined(DBGMCU_APB1_FZ_DBG_CAN2_STOP)
+    DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_CAN2_STOP;
+    #endif
 }
 /* USER CODE END PTD */
 
@@ -61,7 +136,7 @@ int _write(int file, char *ptr, int len)
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+uint8_t adr = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -99,7 +174,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  DebugFreeze_Init();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */

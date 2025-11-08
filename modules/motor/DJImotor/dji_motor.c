@@ -201,7 +201,7 @@ DJIMotorInstance *DJIMotorInit(Motor_Init_Config_s *config)
 
     if(config->motor_type == M2006)
     {
-        instance->measure.total_angle = readDjiMotorTotalAngleSetByIndex(idx);
+        instance->measure.total_angle = DjiMotorTotalAngleSet[idx];
         instance->measure.total_round = instance->measure.total_angle / 360.0f;
     }
     // 初始化滤波器
@@ -270,7 +270,7 @@ void DJIMotorSetRef(DJIMotorInstance *motor, float ref)
 {
     motor->motor_controller.pid_ref = ref; 
 }
-
+static HAL_StatusTypeDef status;
 // 为所有电机实例计算三环PID,发送控制报文
 void DJIMotorControl()
 {
@@ -292,7 +292,8 @@ void DJIMotorControl()
         measure = &motor->measure;
         if (motor->motor_type == M2006)
         {
-            writeDjiMotorTotalAngleSetByIndex(i, (int32_t)(measure->total_angle)); // 存储电机总角度
+            writeDjiMotorAngle(i, (int32_t)(measure->total_angle)); // 存储电机总角度
+            // writeDjiMotorAngle(i, (int32_t)0); // 存储电机总角度
         }
         pid_ref = motor_controller->pid_ref; // 保存设定值,防止motor_controller->pid_ref在计算过程中被修改
         if (motor_setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)

@@ -88,6 +88,7 @@ void Error_Handler(void);
 #define CS1_GYRO_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+// 放到合适的头文件后面，保证已包含 stm32xxxx_hal.h / main.h
 
 /* USER CODE END Private defines */
 

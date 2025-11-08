@@ -2,6 +2,7 @@
 #include "robot_def.h"
 #include "servo_motor.h"
 #include "dji_motor.h"
+#include "dmmotor.h"
 #include "message_center.h"
 #include "bsp_dwt.h"
 #include "general_def.h"
@@ -16,7 +17,7 @@ static DJIMotorInstance *loader; // 拨盘电机
 static DJIMotorInstance *loader_1; //同步上下
 static DJIMotorInstance *loader_2; //左右
 static DJIMotorInstance *loader_3; //限位
-
+static DMMotorInstance *rotateChageDarts; //拨盘电机dm
 // 扳机舵机
 static ServoInstance *banji_motor;
 
@@ -125,125 +126,6 @@ void ShootInit()
         .servo_type=PWM_Servo,
     };
     banji_motor= ServoInit(&banji_config);
-
-
-    // 2006
-    Motor_Init_Config_s loader_config = {
-        .can_init_config = {
-            .can_handle = &hcan1,
-            .tx_id = 5,
-        },
-        .controller_param_init_config = {
-            .angle_PID = {
-                // 如果启用位置环来控制发弹,需要较大的I值保证输出力矩的线性度否则出现接近拨出的力矩大幅下降
-                .Kp = 100, // 10
-                .Ki = 0,
-                .Kd = 1,
-                .MaxOut = 80000,
-            },
-            .speed_PID = {
-                .Kp = 15, // 10
-                .Ki = 1, // 1
-                .Kd = 0,
-                .Improve = PID_Integral_Limit,
-                .IntegralLimit = 5000,
-                .MaxOut = 5000,
-            },
-            .current_PID = {
-                .Kp = 0.5, // 0.7
-                .Ki = 0.1, // 0.1
-                .Kd = 0,
-                .Improve = PID_Integral_Limit,
-                .IntegralLimit = 5000,
-                .MaxOut = 5000,
-            },
-        },
-        .controller_setting_init_config = {
-            .angle_feedback_source = MOTOR_FEED, .speed_feedback_source = MOTOR_FEED,
-            .outer_loop_type = SPEED_LOOP, // 初始化成SPEED_LOOP,让拨盘停在原地,防止拨盘上电时乱转
-            .close_loop_type = CURRENT_LOOP | SPEED_LOOP | ANGLE_LOOP,
-            .motor_reverse_flag = MOTOR_DIRECTION_NORMAL, // 注意方向设置为拨盘的拨出的击发方向 MOTOR_DIRECTION_NORMAL MOTOR_DIRECTION_REVERSE
-            // .motor_reverse_flag = MOTOR_DIRECTION_REVERSE
-        },
-        .motor_type = M2006 // 英雄使用m3508
-    };
-    Motor_Init_Config_s loader_config_1 = {
-        .can_init_config = {
-            .can_handle = &hcan1,
-            .tx_id = 7,
-        },
-        .controller_param_init_config = {
-            .angle_PID = {
-                // 如果启用位置环来控制发弹,需要较大的I值保证输出力矩的线性度否则出现接近拨出的力矩大幅下降
-                .Kp = 100, // 10
-                .Ki = 0,
-                .Kd = 1,
-                .MaxOut =80000,
-            },
-            .speed_PID = {
-                .Kp = 15, // 10
-                .Ki = 1, // 1
-                .Kd = 0,
-                .Improve = PID_Integral_Limit,
-                .IntegralLimit = 5000,
-                .MaxOut = 5000,
-            },
-            .current_PID = {
-                .Kp = 0.5, // 0.7
-                .Ki = 0.1, // 0.1
-                .Kd = 0,
-                .Improve = PID_Integral_Limit,
-                .IntegralLimit = 5000,
-                .MaxOut = 5000,
-            },
-        },
-        .controller_setting_init_config = {
-            .angle_feedback_source = MOTOR_FEED, .speed_feedback_source = MOTOR_FEED,
-            .outer_loop_type = SPEED_LOOP, // 初始化成SPEED_LOOP,让拨盘停在原地,防止拨盘上电时乱转
-            .close_loop_type = CURRENT_LOOP | SPEED_LOOP | ANGLE_LOOP,
-            // .motor_reverse_flag = MOTOR_DIRECTION_NORMAL, // 注意方向设置为拨盘的拨出的击发方向 MOTOR_DIRECTION_NORMAL MOTOR_DIRECTION_REVERSE
-            .motor_reverse_flag = MOTOR_DIRECTION_REVERSE
-        },
-        .motor_type = M2006 
-    }; 
-    Motor_Init_Config_s loader_config_2 = {
-        .can_init_config = {
-            .can_handle = &hcan1,
-            .tx_id = 3,
-        },
-        .controller_param_init_config = {
-            .angle_PID = {
-                // 如果启用位置环来控制发弹,需要较大的I值保证输出力矩的线性度否则出现接近拨出的力矩大幅下降
-                .Kp = 100, // 10
-                .Ki = 0,
-                .Kd = 1,
-                .MaxOut =80000,
-            },
-            .speed_PID = {
-                .Kp = 15, // 10
-                .Ki = 1, // 1
-                .Kd = 0,
-                .Improve = PID_Integral_Limit,
-                .IntegralLimit = 5000,
-                .MaxOut = 5000,
-            },
-            .current_PID = {
-                .Kp = 0.5, // 0.7
-                .Ki = 0.1, // 0.1
-                .Kd = 0,
-                .Improve = PID_Integral_Limit,
-                .IntegralLimit = 5000,
-                .MaxOut = 5000,
-            },
-        },
-        .controller_setting_init_config = {
-            .angle_feedback_source = MOTOR_FEED, .speed_feedback_source = MOTOR_FEED,
-            .outer_loop_type = SPEED_LOOP, // 初始化成SPEED_LOOP,让拨盘停在原地,防止拨盘上电时乱转
-            .close_loop_type = CURRENT_LOOP | SPEED_LOOP | ANGLE_LOOP,
-            .motor_reverse_flag = MOTOR_DIRECTION_NORMAL, // 注意方向设置为拨盘的拨出的击发方向 MOTOR_DIRECTION_NORMAL MOTOR_DIRECTION_REVERSE
-        },
-        .motor_type = M2006 // 英雄使用m3508
-    };    
     Motor_Init_Config_s loader_config_3 = {
         .can_init_config = {
             .can_handle = &hcan2,
@@ -283,10 +165,35 @@ void ShootInit()
         },
         .motor_type = M2006 // 英雄使用m3508
     };       
-    loader_1 = DJIMotorInit(&loader_config_1);
-    loader = DJIMotorInit(&loader_config);
-    loader_2 = DJIMotorInit(&loader_config_2);
     loader_3 = DJIMotorInit(&loader_config_3);
+    // 达妙电机配置 - MIT 模式
+    Motor_Init_Config_s dm_motor_config = {
+        .can_init_config = {
+            .can_handle = &hcan1,  // 确认这是正确的 CAN 总线
+            .tx_id = 0x01,             // 确认这是达妙电机的正确 ID
+            .rx_id = 0x00,
+        },
+        .controller_param_init_config = {
+            .current_PID = {
+                .Kp = 300,
+                .Ki = 0,
+                .Kd = 0.05,
+                .Improve = PID_Integral_Limit,
+                .IntegralLimit = 5000,
+                .MaxOut = 5000,
+            },
+        },
+        .controller_setting_init_config = {
+            .angle_feedback_source = MOTOR_FEED,
+            .speed_feedback_source = MOTOR_FEED,
+            .outer_loop_type = SPEED_LOOP,
+            .close_loop_type = CURRENT_LOOP,
+            .motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
+        },
+        .motor_type = G6220  // 达妙电机类型
+    };
+    rotateChageDarts = DMMotorInit(&dm_motor_config, DM_MIT_MODE);
+    
     shoot_pub = PubRegister("shoot_feed", sizeof(Shoot_Upload_Data_s));
     shoot_sub = SubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
 }
@@ -308,6 +215,8 @@ void ShootTask()
 {
     // 从cmd获取控制数据
     SubGetMessage(shoot_sub, &shoot_cmd_recv);
+
+    DMMotorSetRef(rotateChageDarts, 3.14,0);
     // 初始化丝杆角度
     if(read_2006_angle==1)
     {
@@ -376,20 +285,10 @@ void ShootTask()
     if(f==0){
         init_angle();
     }
-    // if(key==1){
-    //     relay_control(1,1);
-    // }
-    // 若不在休眠状态,根据robotCMD传来的控制模式进行拨盘电机参考值设定和模式切换
     switch (shoot_cmd_recv.load_mode)
     {
         // 停止拨盘
         case LOAD_STOP:
-            DJIMotorOuterLoop(loader, SPEED_LOOP); // 切换到速度环
-            DJIMotorSetRef(loader, 0);             // 同时设定参考值为0,这样停止的速度最快
-            DJIMotorOuterLoop(loader_1, SPEED_LOOP); // 切换到速度环
-            DJIMotorSetRef(loader_1, 0);             // 同时设定参考值为0,这样停止的速度最快
-            DJIMotorOuterLoop(loader_2, SPEED_LOOP); // 切换到速度环
-            DJIMotorSetRef(loader_2, 0);             // 同时设定参考值为0,这样停止的速度最快
             DJIMotorOuterLoop(loader_3, SPEED_LOOP); // 切换到速度环
             DJIMotorSetRef(loader_3, 0);             // 同时设定参考值为0,这样停止的速度最快
             break;
@@ -397,10 +296,11 @@ void ShootTask()
         case AUTO_LOAD:
             DJIMotorOuterLoop(loader_3, SPEED_LOOP);
     
-        if(f&&reload_auto&&!flag_arm_sucess){
+            if(f&&reload_auto&&!flag_arm_sucess){
                 DJIMotorOuterLoop(loader, ANGLE_LOOP);
                 DJIMotorOuterLoop(loader_1, ANGLE_LOOP);
                 DJIMotorOuterLoop(loader_2, ANGLE_LOOP);
+
                 switch (key)
                 {
                 case 1://第一发不用换弹
@@ -656,8 +556,6 @@ void ShootTask()
         case TEST:
             DJIMotorOuterLoop(loader_3, SPEED_LOOP);
             DJIMotorSetRef(loader_3, shoot_cmd_recv.shoot_rate);
-            // DJIMotorSetRef(loader, TOTAL_ANGLE_D1);
-            // DJIMotorSetRef(loader, TOTAL_ANGLE_W);
             break;
 
 

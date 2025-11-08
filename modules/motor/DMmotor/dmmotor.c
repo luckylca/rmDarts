@@ -74,9 +74,6 @@ DMMotorInstance *DMMotorInit(Motor_Init_Config_s *config, DMWorkingMode working_
         motor->working_mode = DM_MIT_MODE;
     }
 
-    // motor->measure.total_angle = readDmMotorTotalAngleSetByIndex(idx);
-    // motor->measure.total_round = motor->measure.total_angle / 360.0f;
-
     motor->motor_settings = config->controller_setting_init_config;
     PIDInit(&motor->current_PID, &config->controller_param_init_config.current_PID);
     PIDInit(&motor->speed_PID, &config->controller_param_init_config.speed_PID);
@@ -88,8 +85,6 @@ DMMotorInstance *DMMotorInit(Motor_Init_Config_s *config, DMWorkingMode working_
     config->can_init_config.id = motor;
     motor->motor_can_instance = CANRegister(&config->can_init_config);
 
-
-
     Daemon_Init_Config_s conf = {
         .callback = DMMotorLostCallback,
         .owner_id = motor,
@@ -100,8 +95,8 @@ DMMotorInstance *DMMotorInit(Motor_Init_Config_s *config, DMWorkingMode working_
     DMMotorEnable(motor);
     DMMotorSetMode(DM_CMD_MOTOR_MODE, motor);
     DWT_Delay(0.1);
-    DMMotorCaliEncoder(motor);
-    DWT_Delay(0.1);
+    // DMMotorCaliEncoder(motor);
+    // DWT_Delay(0.1);
     dm_motor_instance[idx++] = motor;
     return motor;
 }

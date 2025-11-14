@@ -33,7 +33,9 @@
         "typeinfo": "c",
         "motor_task.h": "c",
         "encoder_task.h": "c",
-        "robot_task.h": "c"
+        "robot_task.h": "c",
+        "stdlib.h": "c",
+        "bmi088.h": "c"
     },
     // "terminal.integrated.defaultProfile.windows": "mysys2-mingw64", // 若希望为默认终端可以加入这一句
     "terminal.integrated.profiles.windows": {

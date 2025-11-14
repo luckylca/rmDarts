@@ -1,8 +1,8 @@
 /**
  * @file chassis.c
  * @author NeoZeng neozng1@hnu.edu.cn
- * @brief 底盘应用,负责接收robot_cmd的控制命令并根据命令进行运动学解算,得到输出
- *        注意底盘采取右手系,对于平面视图,底盘纵向运动的正前方为x正方向;横向运动的右侧为y正方向
+ * @brief 负责接收robot_cmd的控制命令并根据命令，进行蓄力电机的控制
+ *        
  *
  * @version 0.1
  * @date 2022-12-04
@@ -45,7 +45,7 @@ static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数�
 static referee_info_t* referee_data; // 用于获取裁判系统的数据
 static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
 
-static DJIMotorInstance *motor_lf, *motor_rf; // left right forward back
+static DJIMotorInstance *motor_lf, *motor_rf; // 两边的蓄力电机
 
 // 左右电机上电角度
 static float original_angle_left = 0;
@@ -65,7 +65,7 @@ static float chassis_v1, chassis_v_;     // 将云台系的速度投影到底盘
 static float vt_lf, vt_rf, vt_lb, vt_rb; // 底盘速度解算后的临时输出,待进行限幅
 
 // 拉力传感器数据
-extern double F_data_1;
+extern double F_data[2];
 // 3508到位标志位
 int flag_3508_ready = 0;
 // 完成机械臂动作
@@ -197,9 +197,7 @@ void ChassisTask()
     // 根据控制模式设定旋转速度
     switch (chassis_cmd_recv.chassis_mode)
     {
-        case OPEN_3508: 
-            // DJIMotorSetRef(motor_lf, 200);
-            // DJIMotorSetRef(motor_rf, 200);
+        case TEST: 
             DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);//2000 左右能动
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
             break;
@@ -216,7 +214,7 @@ void ChassisTask()
                     //     flag_loadok = 1;
                     // } 
                     if(key==1||key==2)
-                        if(F_data_1 <= FOCE_3508_STAY1)
+                        if(F_data[0] <= FOCE_3508_STAY1)
                         {
                             DJIMotorSetRef(motor_lf, SPEED_3508);
                             DJIMotorSetRef(motor_rf, SPEED_3508);
@@ -227,7 +225,7 @@ void ChassisTask()
                             DJIMotorSetRef(motor_rf, 0.5*SPEED_3508);                   
                         }
                     else if(key==3||key==4){
-                        if(F_data_1 <= FOCE_3508_STAY2)
+                        if(F_data[0] <= FOCE_3508_STAY2)
                         {
                             DJIMotorSetRef(motor_lf, SPEED_3508);
                             DJIMotorSetRef(motor_rf, SPEED_3508);
@@ -251,7 +249,7 @@ void ChassisTask()
                     }
 
                     if(!flag_3508_max){
-                        if(F_data_1 <= FOCE_3508_MAX)
+                        if(F_data[0] <= FOCE_3508_MAX)
                         {
                             DJIMotorSetRef(motor_lf, SPEED_3508);
                             DJIMotorSetRef(motor_rf, SPEED_3508);
@@ -284,7 +282,7 @@ void ChassisTask()
                         }   
                     }
                     else if(flag_2006_target_ready == false){
-                        if(F_data_1 <= FOCE_3508_MAX)
+                        if(F_data[0] <= FOCE_3508_MAX)
                         {
                             DJIMotorSetRef(motor_lf, SPEED_3508);
                             DJIMotorSetRef(motor_rf, SPEED_3508);
@@ -304,13 +302,13 @@ void ChassisTask()
 
                 // 3508到位判断
                 if(key==1||key==2){
-                    if(flag_3508_ready == 0 && F_data_1 >= FOCE_3508_STAY1)
+                    if(flag_3508_ready == 0 && F_data[0] >= FOCE_3508_STAY1)
                     {   
                         flag_3508_ready = 1;
                     }
                 }
                 else if(key==3||key==4){
-                    if(flag_3508_ready == 0 && F_data_1 >= FOCE_3508_STAY2)
+                    if(flag_3508_ready == 0 && F_data[0] >= FOCE_3508_STAY2)
                     {   
                         flag_3508_ready = 1;
                     }                    

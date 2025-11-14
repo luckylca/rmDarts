@@ -129,7 +129,6 @@ modules/bluetooth/HC05.c \
 modules/BMI088/bmi088.c \
 modules/imu/BMI088driver.c \
 modules/imu/BMI088Middleware.c \
-modules/encoder/encoder_task.c \
 modules/encoder/encoder.c \
 modules/imu/ins_task.c \
 modules/ist8310/ist8310.c \
@@ -155,6 +154,7 @@ modules/can_comm/can_comm.c \
 modules/message_center/message_center.c \
 modules/daemon/daemon.c \
 modules/alarm/buzzer.c \
+application/status.c \
 application/gimbal/gimbal.c \
 application/chassis/chassis.c \
 application/shoot/shoot.c \

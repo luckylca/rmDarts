@@ -9,7 +9,7 @@
 #include "remote_control.h"
 #include "robot_cmd.h"
 #include <stdbool.h>
-
+#include "cmsis_os.h"
 
 #define DEAD_LINE_LOAD 20
 /* 对于双发射机构的机器人,将下面的数据封装成结构体即可,生成两份shoot应用实例 */
@@ -175,20 +175,9 @@ void ShootInit()
         },
         .controller_param_init_config = {
             .current_PID = {
-                .Kp = 300,
-                .Ki = 0,
-                .Kd = 0.05,
-                .Improve = PID_Integral_Limit,
-                .IntegralLimit = 5000,
-                .MaxOut = 5000,
+                .Kp = 3,
+                .Kd = 0.3,
             },
-        },
-        .controller_setting_init_config = {
-            .angle_feedback_source = MOTOR_FEED,
-            .speed_feedback_source = MOTOR_FEED,
-            .outer_loop_type = SPEED_LOOP,
-            .close_loop_type = CURRENT_LOOP,
-            .motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
         },
         .motor_type = G6220  // 达妙电机类型
     };
@@ -215,7 +204,6 @@ void ShootTask()
 {
     // 从cmd获取控制数据
     SubGetMessage(shoot_sub, &shoot_cmd_recv);
-
     DMMotorSetRef(rotateChageDarts, 3.14,0);
     // 初始化丝杆角度
     if(read_2006_angle==1)
@@ -747,7 +735,7 @@ void ShootTask()
         break;
     default:
         break;
-       
+
     }
 
 

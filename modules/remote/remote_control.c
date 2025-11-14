@@ -13,8 +13,7 @@ static uint8_t rc_init_flag = 0; // 遥控器初始化标志位
 
 int16_t rc_cyy[6]; // 遥控器数据   
 // 拉力传感器数据
-double F_data_1; 
-double F_data_2;
+double F_data[2] = {0};
 static uint8_t F_init_flag = 0; 
 static int32_t weight1=0;
 static double  result1=0;
@@ -287,15 +286,15 @@ double decode_status(uint8_t X6, int32_t weight)
 
 
 
-static void f_data_slove(const uint8_t *F_data_buf)
+static void f_data_solve(const uint8_t *F_data_buf)
 {
     weight1 = decode_weight(F_data_buf[2],F_data_buf[3],F_data_buf[4],F_data_buf[5],F_data_buf[6]);
     result1 = decode_status(F_data_buf[7], weight1); 
-    F_data_1 = result1;
-
+    F_data[0] = result1;
+    
     weight2 = decode_weight(F_data_buf[10],F_data_buf[11],F_data_buf[12],F_data_buf[13],F_data_buf[14]);
     result2 = decode_status(F_data_buf[15], weight2);
-    F_data_2 = result2;
+    F_data[1] = result2;
 }
 
 /**
@@ -305,7 +304,7 @@ static void f_data_slove(const uint8_t *F_data_buf)
 static void F_RxCallback()
 {
     DaemonReload(F_daemon_instance);         // 先喂狗
-    f_data_slove(F_usart_instance->recv_buff); // 进行协议解析
+    f_data_solve(F_usart_instance->recv_buff); // 进行协议解析
 }
 
 /**
@@ -314,8 +313,8 @@ static void F_RxCallback()
  */
 static void FLostCallback(void *id)
 {
-    F_data_1 = 0; // 清空拉力传感器数据
-    F_data_2 = 0;
+    F_data[0] = 0; // 清空拉力传感器数据
+    F_data[1] = 0;
     HAL_UART_Transmit(&huart6, rs485buf, 5, 1000);
     USARTServiceInit(F_usart_instance); // 尝试重新启动接收
     LOGWARNING("[F] remote control lost");
@@ -338,7 +337,7 @@ double* F_Init(UART_HandleTypeDef *F_usart_handle)
     F_daemon_instance = DaemonRegister(&F_daemon_conf);
 
     F_init_flag = 1;
-    return &F_data_1;
+    return F_data;
 }
 
 uint8_t F_IsOnline()

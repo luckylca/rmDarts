@@ -18,7 +18,7 @@
 #include "remote_control.h"
 #include "bsp_log.h"
 #include "robot_cmd.h" 
-#include "encoder_task.h"
+#include "encoder.h"
 
 osThreadId insTaskHandle;
 osThreadId robotTaskHandle;

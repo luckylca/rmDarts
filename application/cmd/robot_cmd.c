@@ -45,7 +45,9 @@ static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信�
 static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息,底盘功率枪口热量与底盘运动状态等
 
 static RC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
-static double *F_data;              // 拉力数据,初始化时返回
+static volatile double *F_data = NULL;
+double F_data_1 = 0;
+double F_data_2 = 0;
 static Vision_Recv_s *vision_recv_data; // 视觉接收数据指针,初始化时返回
 static Vision_Send_s vision_send_data;  // 视觉发送数据
 
@@ -127,9 +129,9 @@ float out, last_in;
 float T=0.1;
 float forward_feed(float in)
 {
-   out=(in-last_in)/T+in;
-   last_in=in;
-   return out;
+    out=(in-last_in)/T+in;
+    last_in=in;
+    return out;
 }
 
 void RobotCMDInit()
@@ -150,7 +152,6 @@ void RobotCMDInit()
     F_data = F_Init(&huart6);
 
     vision_recv_data = VisionInit(&huart2); // 视觉通信串口，这个不实际占用串口
-    // setAllMotorZero();
     
     readAllMotorAngle(); // 从EEPROM加载所有电机总角度数据
     // imageRoad_data = ImageRoadTaskInit(&huart1);
@@ -201,22 +202,24 @@ static void CalcOffsetAngle()
  */
 static void RemoteControlSet()
 {
-    // 控制底盘和云台运行模式,云台待添加,云台是否始终使用IMU数据?
+    // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
     if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 
     {
-        chassis_cmd_send.chassis_mode = OPEN_3508;//CHASSIS_FOLLOW_GIMBAL_YAW;
+        chassis_cmd_send.chassis_mode = TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
-        // shoot_cmd_send.load_mode = LOAD_NORMAL;
         shoot_cmd_send.load_mode = TEST;
-        // 左往上拨换弹一次
-        if(switch_is_up(rc_data[TEMP].rc.switch_left) && last_OP != RC_SW_UP){
-            reload=1;
+        if (rc_data[TEMP].rc.dial > 0 )// 拨轮打开发射
+        {
+
+            shoot_cmd_send.banji_mode = BANJI_ON;
         }
-        last_OP=rc_data[TEMP].rc.switch_left;
-        
+        else
+        {
+            // 默认锁定
+            shoot_cmd_send.banji_mode = BANJI_OFF;
+        }
         shoot_cmd_send.shoot_rate = 60.0f * (float)rc_data[TEMP].rc.rocker_l1;    //参数  要改
         chassis_cmd_send.v1 = 30.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
-        // chassis_cmd_send.v1 = 500;
     }
     else if (switch_is_down(rc_data[TEMP].rc.switch_right)) // 
     {
@@ -228,11 +231,9 @@ static void RemoteControlSet()
     }
     else if (switch_is_up(rc_data[TEMP].rc.switch_right))
     {
-        // chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
-        chassis_cmd_send.chassis_mode = OPEN_3508;
+        chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
-        // shoot_cmd_send.load_mode = AUTO_LOAD;
-        shoot_cmd_send.load_mode = TEST;
+        shoot_cmd_send.load_mode = AUTO_LOAD;
         //初始化2006
         if(flag_init_goal==false)
         {
@@ -303,17 +304,12 @@ static void RemoteControlSet()
     {
         // 默认锁定
         shoot_cmd_send.banji_mode = BANJI_OFF;
-       
     }
 
     // 云台参数,确定云台控制数据
     if (switch_is_mid(rc_data[TEMP].rc.switch_left)) // 
     {   
-        if(rc_data[TEMP].rc.rocker_l1==-660)
-        {
-            gimbal_cmd_send.gimbal_mode = AUTO_DART;
-        }
-        else gimbal_cmd_send.gimbal_mode = TWO_YAW;
+        gimbal_cmd_send.gimbal_mode = TSET;
         if(gimbal_cmd_send.yaw>30)
         {
             gimbal_cmd_send.yaw=30;
@@ -354,7 +350,7 @@ static void RemoteControlSet()
     }
 
     else if (switch_is_down(rc_data[TEMP].rc.switch_left))// || vision_recv_data->target_state == NO_TARGET
-    { // 按照摇杆的输出大小进行角度增量,增益系数需调整
+    {
         gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
         chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
@@ -366,7 +362,7 @@ static void RemoteControlSet()
     // 发射参数
     else if (switch_is_up(rc_data[TEMP].rc.switch_left)) // 左 侧开关状态[上],
     {
-         gimbal_cmd_send.gimbal_mode = TWO_YAW;
+        gimbal_cmd_send.gimbal_mode = TSET;
         gimbal_cmd_send.yaw += 0.001f * (float)rc_data[TEMP].rc.rocker_l_;
         gimbal_cmd_send.bottom += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
 
@@ -388,7 +384,6 @@ static void RemoteControlSet()
             gimbal_cmd_send.bottom=-30;
         }
         
-       
         
         // gimbal_cmd_send.gimbal_mode = AUTO_DART;
     }                                       
@@ -445,22 +440,11 @@ static void EmergencyHandler()
         shoot_cmd_send.shoot_mode = SHOOT_ON;
         LOGINFO("[CMD] reinstate, robot ready");
     }
-
-    // if(alarm_count > 5)
-    // {
-    //  //   RemoteControl_outline_ALARM();
-    // }
-    // else 
-    // {
-    //      AlarmSetStatus(remot_alarm, ALARM_OFF);
-    // }
-    
-
 }
 
 void RobotCMDTask()
 {
-   
+
 #ifdef ONE_BOARD
     SubGetMessage(chassis_feed_sub, (void *)&chassis_fetch_data);
 #endif // ONE_BOARD
@@ -470,7 +454,6 @@ void RobotCMDTask()
     SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
     SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
     referee_info = Get_referee_info();
-
     RemoteControlSet();   
     EmergencyHandler(); // 处理模块离线和遥控器急停等紧急情况
 

@@ -1,3 +1,13 @@
+/**
+ * @file at24c02.c
+ * @author lucky
+ * @author lca
+ * @version 1.0
+ * @date 2025-11-14
+ *
+ * @copyright Copyright (c) lucky all rights reserved
+ *
+ */
 #include "at24c02.h"
 #include "i2c.h"
 #include "string.h"

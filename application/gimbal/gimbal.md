@@ -1,8 +1,12 @@
 # gimbal
 
-
+yaw电机接受视觉控制以及目标切换（16m、25m）
+cyy_test_data 来自于视觉控制的数据为误差量，所以原来控制的target是一个积分量
+后续可能考虑坐标变换问题改成一个绝对量
+cyy_target_todo的作用是在做一个异步操作，在到达视觉目标位置之前是不会再次接受视觉的控制数据的。
 
 ## 工作流程
+
 
 初始化pitch和yaw电机以及一个imu。订阅gimbal_cmd消息（来自robot_cmd）并发布gimbal_feed话题。
 

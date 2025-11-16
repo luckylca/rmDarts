@@ -183,8 +183,16 @@ static void sbus_to_rc_cyy(const uint8_t *sbus_buf)
 static void RemoteControlRxCallback()
 {
     DaemonReload(rc_daemon_instance);         // 先喂狗
-    // sbus_to_rc_cyy(rc_usart_instance->recv_buff); // 进行协议解析
-    sbus_to_rc(rc_usart_instance->recv_buff);
+
+    if(USE_CYY_SBUS_REMOTE)
+    {
+        sbus_to_rc_cyy(rc_usart_instance->recv_buff); // 使用Sbus进行协议解析
+    } 
+    else
+    {
+        sbus_to_rc(rc_usart_instance->recv_buff); // 使用DBUS进行协议解析
+    }
+        
 }
 
 /**

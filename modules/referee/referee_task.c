@@ -57,8 +57,8 @@ referee_info_t *ReTaskInit(UART_HandleTypeDef *referee_usart_handle)
 
 void UITask()
 {
-    RobotModeTest(Interactive_data); // 测试用函数，实现模式自动变化,用于检查该任务和裁判系统是否连接正常
-    MyUIRefresh(referee_recv_info, Interactive_data);
+    // RobotModeTest(Interactive_data); // 测试用函数，实现模式自动变化,用于检查该任务和裁判系统是否连接正常
+    // MyUIRefresh(referee_recv_info, Interactive_data);
 }
 
 static Graph_Data_t UI_shoot_line[10]; // 射击准线
@@ -127,6 +127,7 @@ void MyUIInit()
 // 测试用函数，实现模式自动变化,用于检查该任务和裁判系统是否连接正常
 static uint8_t count = 0;
 static uint16_t count1 = 0;
+/*
 static void RobotModeTest(Referee_Interactive_info_t *_Interactive_data) // 测试用函数，实现模式自动变化
 {
     count++;
@@ -260,7 +261,7 @@ static void MyUIRefresh(referee_info_t *referee_recv_info, Referee_Interactive_i
         _Interactive_data->Referee_Interactive_Flag.Power_flag = 0;
     }
 }
-
+*/
 /**
  * @brief  模式切换检测,模式发生切换时，对flag置位
  * @param  Referee_Interactive_info_t *_Interactive_data

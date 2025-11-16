@@ -83,11 +83,8 @@ typedef enum
 typedef enum
 {
     CHASSIS_ZERO_FORCE = 0,    // 电流零输入
-    TEST,
+    CHASSIS_TEST,
     AUTO_MODE,
-    CHASSIS_ROTATE,
-    CHASSIS_NO_FOLLOW,
-    CHASSIS_FOLLOW_GIMBAL_YAW,
 } chassis_mode_e;
 
 // 云台模式设置
@@ -96,7 +93,7 @@ typedef enum
     GIMBAL_ZERO_FORCE = 0, // 电流零输入
     GIMBAL_FREE_MODE,      // 云台自由运动模式,即与底盘分离(底盘此时应为NO_FOLLOW)反馈值为电机total_angle;似乎可以改为全部用IMU数据?
     GIMBAL_GYRO_MODE,      // 云台陀螺仪反馈模式,反馈值为陀螺仪pitch,total_yaw_angle,底盘可以为小陀螺和跟随模式
-    TSET,
+    GIMBAL_TEST,
     AUTO_DART,
 
 } gimbal_mode_e;
@@ -105,14 +102,15 @@ typedef enum
 typedef enum
 {
     SHOOT_OFF = 0,
+    SHOOT_TEST,
+    SHOOT_AUTO,
     SHOOT_ON
-    
 } shoot_mode_e;
 typedef enum
 {
     BANJI_OFF = 0, // 摩擦轮关闭
     BANJI_ON,      // 摩擦轮开启
-    BANJI_ON_AUTO
+    BANJI_AUTO
 } banji_mode_e;
 typedef enum
 {
@@ -129,12 +127,15 @@ typedef enum
 typedef enum
 {
     LOAD_STOP = 0,  // 停止发射
-    LOAD_REVERSE,   // 反转
-    LOAD_NORMAL,  // zheng
     AUTO_LOAD,
-    TEST,
+    LOADER_TEST,
 } loader_mode_e;
-
+typedef enum
+{
+    ROTATE_STOP = 0,  // 停止
+    ROTATE_TEST,   // 旋转测试模式
+    ROTATE_AUTO,   // 自动旋转模式
+} rotate_mode_e;
 
 // 目标宏定义
 typedef enum
@@ -183,10 +184,12 @@ typedef struct
 // cmd发布的发射控制数据,由shoot订阅
 typedef struct
 {
-    shoot_mode_e shoot_mode;
-    loader_mode_e load_mode;
-    banji_mode_e banji_mode;
+    shoot_mode_e shoot_mode;//总的模式
+    loader_mode_e load_mode;//丝杆模式
+    banji_mode_e banji_mode;//扳机模式
+    rotate_mode_e rotate_mode;//旋转换弹模式
     float shoot_rate;
+    float rotate_rate;
     float banjiPos;
 } Shoot_Ctrl_Cmd_s;
 

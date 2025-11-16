@@ -25,6 +25,15 @@ static float uint_to_float(int x_int, float x_min, float x_max, int bits)
     return ((float)x_int) * span / ((float)((1 << bits) - 1)) + offset;
 }
 
+float degree_to_radian_dm(float *angle)
+{
+    return *angle * PI / 180.0f;
+}
+
+float radian_to_degree_dm(float *angle)
+{
+    return *angle * 180.0f / PI;
+}
 static void DMMotorSetMode(DMMotor_Mode_e cmd, DMMotorInstance *motor)
 {
     memset(motor->motor_can_instance->tx_buff, 0xff, 7);  // 发送电机指令的时候前面7bytes都是0xff
@@ -135,28 +144,37 @@ void DMMotorTask(void const *argument)
     DMMotor_Send_s motor_send_mailbox;
     while (1)
     {
-        if (motor->working_mode == DM_MIT_MODE)//如果使用 MIT 模式，底层需要大改，需要拿到期望的位置和期望的速度，甚至还有 kp 和 kd
+        if (motor->working_mode == DM_MIT_MODE)
         {
             tffSet = motor->tff;
-            kp = motor->current_PID.Kp;
-            kd = motor->current_PID.Kd;
-            pid_ref = motor->pid_ref;
+            pid_ref = motor->pid_ref;  
+            if(motor->motor_settings.outer_loop_type == ANGLE_LOOP)
+            {
+                kp = motor->angle_PID.Kp;
+                kd = motor->angle_PID.Kd;
+                LIMIT_MIN_MAX(pid_ref, DM_P_MIN, DM_P_MAX);
+                motor_send_mailbox.position_des = float_to_uint(pid_ref, DM_P_MIN, DM_P_MAX, 16);
+            }
+            else if(motor->motor_settings.outer_loop_type == SPEED_LOOP)
+            {
+                kp = motor->speed_PID.Kp;
+                kd = motor->speed_PID.Kd;
+                LIMIT_MIN_MAX(pid_ref, DM_V_MIN, DM_V_MAX);
+                motor_send_mailbox.velocity_des = float_to_uint(pid_ref, DM_V_MIN, DM_V_MAX, 12);
+            }
             if (setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)
                 pid_ref *= -1;
-
-            LIMIT_MIN_MAX(pid_ref, DM_P_MIN, DM_P_MAX);
-            motor_send_mailbox.position_des = float_to_uint(pid_ref, DM_P_MIN, DM_P_MAX, 16);
-            motor_send_mailbox.velocity_des = float_to_uint(0, DM_V_MIN, DM_V_MAX, 12);
+                
             motor_send_mailbox.torque_des = float_to_uint(tffSet, DM_T_MIN, DM_T_MAX, 12);
             motor_send_mailbox.Kp = kp;
             motor_send_mailbox.Kd = kd;
 
-            if (motor->stop_flag == MOTOR_STOP)
+            if (motor->stop_flag == MOTOR_STOP) {
+                motor_send_mailbox.velocity_des = float_to_uint(0, DM_V_MIN, DM_V_MAX, 12);
                 motor_send_mailbox.torque_des = float_to_uint(0, DM_T_MIN, DM_T_MAX, 12);
+            }
 
         }
-
-
         motor->motor_can_instance->tx_buff[0] = (uint8_t)(motor_send_mailbox.position_des >> 8);
         motor->motor_can_instance->tx_buff[1] = (uint8_t)(motor_send_mailbox.position_des);
         motor->motor_can_instance->tx_buff[2] = (uint8_t)(motor_send_mailbox.velocity_des >> 4);

@@ -70,6 +70,7 @@ typedef struct
     uint8_t message_num;
 
     Motor_Type_e motor_type;        // 电机类型
+    STORAGE_Type_e storage_type;    // 是否使用存储功能
     Motor_Working_Type_e stop_flag; // 启停标志
 
     DaemonInstance* daemon;

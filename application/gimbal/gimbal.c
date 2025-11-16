@@ -26,7 +26,7 @@ void GimbalInit()
     Motor_Init_Config_s yaw_config = {
         .can_init_config = {
             .can_handle = &hcan2,
-            .tx_id = 4,
+            .tx_id = 3,
         },
         .controller_param_init_config = {
             .angle_PID = {
@@ -58,7 +58,8 @@ void GimbalInit()
             .close_loop_type = CURRENT_LOOP | SPEED_LOOP,
             .motor_reverse_flag = MOTOR_DIRECTION_NORMAL, //  MOTOR_DIRECTION_NORMAL MOTOR_DIRECTION_REVERSE
         },
-        .motor_type = M2006
+        .motor_type = M2006,    
+        .storage_type = USE_STORAGE
     };   
     // 电机对total_angle闭环,上电时为零,会保持静止,收到遥控器数据再动
     yaw_motor = DJIMotorInit(&yaw_config);
@@ -71,7 +72,7 @@ void GimbalInit()
         .callback = NULL,
         .id = NULL,
     };
-    encoder = EncoderInit(&encoder_spi_config);
+    // encoder = EncoderInit(&encoder_spi_config);
 
     gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     gimbal_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
@@ -88,7 +89,7 @@ void GimbalTask()
         case GIMBAL_ZERO_FORCE:
             DJIMotorStop(yaw_motor);
             break;
-        case TEST:
+        case GIMBAL_TEST:
             DJIMotorEnable(yaw_motor);
             DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw);//这里大概率还需要调节系数
             break;

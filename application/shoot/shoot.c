@@ -9,17 +9,16 @@
 #include "remote_control.h"
 #include "robot_cmd.h"
 #include <stdbool.h>
-#include "cmsis_os.h"
+
 
 #define DEAD_LINE_LOAD 20
-/* 对于双发射机构的机器人,将下面的数据封装成结构体即可,生成两份shoot应用实例 */
-static DJIMotorInstance *loader; // 拨盘电机
-static DJIMotorInstance *loader_1; //同步上下
-static DJIMotorInstance *loader_2; //左右
-static DJIMotorInstance *loader_3; //限位
+static DJIMotorInstance *chargeLoader; //蓄力丝杆
 static DMMotorInstance *rotateChageDarts; //拨盘电机dm
 // 扳机舵机
 static ServoInstance *banji_motor;
+static ServoInstance *gripper1_motor;
+static ServoInstance *gripper2_motor;
+static ServoInstance *gripper3_motor;
 
 static Publisher_t *shoot_pub;
 static Shoot_Ctrl_Cmd_s shoot_cmd_recv; // 来自cmd的发射控制信息
@@ -59,23 +58,41 @@ extern int flag_3508_max;
 // 2006从初始位置开始记圈到25m的数据
 #define TOTAL_ANGLE_25M  (852947)//(1053786)
 
-//换弹位置
-#define  TOTAL_ANGLE_C1  0   //中间左右
-#define  TOTAL_ANGLE_C2  150000-1   //中间上下
-#define TOTAL_ANGLE_L  770000-1    //左
-#define TOTAL_ANGLE_W  100000-1    //上
-#define TOTAL_ANGLE_R  -770000+1    //右
-#define TOTAL_ANGLE_D1  400000-1    //下1
-#define TOTAL_ANGLE_D2  680000-1    //下2
-#define TOTAL_ANGLE_Loc 430000-1    //发射位置
+//旋转换弹部分的宏定义,参数全部要重新调
+#define dartExistWeight 0
+#define dartNoExistWeight 0
+#define dartExistLength 0
+#define dartNoExistLength 0
+
+// 夹爪和扳机舵机位置宏定义
+#define BANJI_ON_ANGLE 0.078
+#define BANJI_OFF_ANGLE 0.063
+#define GRIPPER_LAY_ANGLE 0
+#define GRIPPER_TAKE_ANGLE 0
 
 int key=1;//换弹标志
 int step=0;//步骤标志
 int f=0;
 int first_time=0;
 
+// 计算力矩前馈
+static float calculateTff()
+{
+    float roatateAngle = radian_to_degree_dm(&rotateChageDarts->measure.position);
+    float tff_temp = 0;
+    float sinTmp0, sinTmp1, sinTmp2, cosTmp;
+    arm_sin_cos_f32(roatateAngle, &sinTmp0, &cosTmp);
+    arm_sin_cos_f32(roatateAngle + 120.0f, &sinTmp1, &cosTmp);
+    arm_sin_cos_f32(roatateAngle - 120.0f, &sinTmp2, &cosTmp);
+    tff_temp = dartExistLength * dartExistWeight * (sinTmp0-sinTmp1-sinTmp2);//全满
+    tff_temp = dartExistLength * dartExistWeight * (sinTmp0) - dartNoExistWeight * dartNoExistLength * (sinTmp2) - dartExistLength * dartExistWeight * (sinTmp1);//1 空
+    tff_temp = dartNoExistLength * dartNoExistWeight * (sinTmp0) - dartNoExistLength * dartNoExistWeight * (sinTmp2) - dartExistLength * dartExistWeight * (sinTmp1);//1,3 空
+    tff_temp = dartNoExistLength * dartNoExistWeight * (sinTmp0-sinTmp1-sinTmp2);//全空
+    return tff_temp;
+}
 
-void relay_control(unsigned int number,unsigned int state) //继电器函数，number编号，state状态，1高0低
+// 继电器控制函数,新的继电器函数是 PC6，PI6，PI7
+void relay_control(unsigned int number,unsigned int state) //继器函数，number编号，state状态，1高0低
 {
 //PWm丝印第一排从右往左io口
 // PE11
@@ -126,7 +143,41 @@ void ShootInit()
         .servo_type=PWM_Servo,
     };
     banji_motor= ServoInit(&banji_config);
-    Motor_Init_Config_s loader_config_3 = {
+    // 1号夹爪
+    Servo_Init_Config_s gripper1_motor_config ={
+        .pwm_init_config={
+            .htim=&htim1,
+            .dutyratio=0,
+            .channel=TIM_CHANNEL_2,
+            .period=0.02,
+        },
+        .servo_type=PWM_Servo,
+    };
+    gripper1_motor= ServoInit(&gripper1_motor_config);
+    // 2 号夹爪
+    Servo_Init_Config_s gripper2_motor_config ={
+        .pwm_init_config={
+            .htim=&htim1,
+            .dutyratio=0,
+            .channel=TIM_CHANNEL_3,
+            .period=0.02,
+        },
+        .servo_type=PWM_Servo,
+    };
+    gripper2_motor= ServoInit(&gripper2_motor_config);
+    // 3 号夹爪
+    Servo_Init_Config_s gripper3_motor_config ={
+        .pwm_init_config={
+            .htim=&htim1,
+            .dutyratio=0,
+            .channel=TIM_CHANNEL_4,
+            .period=0.02,
+        },
+        .servo_type=PWM_Servo,
+    };
+    gripper3_motor= ServoInit(&gripper3_motor_config);
+
+    Motor_Init_Config_s chargeLoader_config = {
         .can_init_config = {
             .can_handle = &hcan2,
             .tx_id = 4,
@@ -161,20 +212,31 @@ void ShootInit()
             .outer_loop_type = SPEED_LOOP, // 初始化成SPEED_LOOP,让拨盘停在原地,防止拨盘上电时乱转
             .close_loop_type = CURRENT_LOOP | SPEED_LOOP | ANGLE_LOOP,
             .motor_reverse_flag = MOTOR_DIRECTION_NORMAL, // 注意方向设置为拨盘的拨出的击发方向 MOTOR_DIRECTION_NORMAL MOTOR_DIRECTION_REVERSE
-            // .motor_reverse_flag = MOTOR_DIRECTION_REVERSE,
         },
-        .motor_type = M2006 // 英雄使用m3508
+        .motor_type = M2006, 
+        .storage_type = USE_STORAGE
     };       
-    loader_3 = DJIMotorInit(&loader_config_3);
+    chargeLoader = DJIMotorInit(&chargeLoader_config);
     // 达妙电机配置 - MIT 模式
     Motor_Init_Config_s dm_motor_config = {
         .can_init_config = {
-            .can_handle = &hcan1,  // 确认这是正确的 CAN 总线
-            .tx_id = 0x01,             // 确认这是达妙电机的正确 ID
+            .can_handle = &hcan1,
+            .tx_id = 0x01,             
             .rx_id = 0x00,
         },
+        .controller_setting_init_config = {
+            .angle_feedback_source = MOTOR_FEED,
+            .speed_feedback_source = MOTOR_FEED,
+            .outer_loop_type = ANGLE_LOOP,
+            .close_loop_type = CURRENT_LOOP | SPEED_LOOP | ANGLE_LOOP,
+            .motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
+        },
         .controller_param_init_config = {
-            .current_PID = {
+            .angle_PID = {
+                .Kp = 3,
+                .Kd = 0.3,
+            },
+            .speed_PID = {
                 .Kp = 3,
                 .Kd = 0.3,
             },
@@ -190,12 +252,7 @@ void ShootInit()
 
 
 void init_angle(){
-    DJIMotorOuterLoop(loader, ANGLE_LOOP);
-    DJIMotorOuterLoop(loader_1, ANGLE_LOOP);
-    DJIMotorOuterLoop(loader_2, ANGLE_LOOP);
-    DJIMotorSetRef(loader, 0);
-    DJIMotorSetRef(loader_1, 0);
-    DJIMotorSetRef(loader_2, 0);
+    DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
     f=1;
 }
 
@@ -204,540 +261,225 @@ void ShootTask()
 {
     // 从cmd获取控制数据
     SubGetMessage(shoot_sub, &shoot_cmd_recv);
-    DMMotorSetRef(rotateChageDarts, 3.14,0);
+    // DMMotorSetRef(rotateChageDarts, 3.14,0);
     // 初始化丝杆角度
     if(read_2006_angle==1)
     {
-        loader_origin_angle = loader_3->measure.total_angle;
+        loader_origin_angle = chargeLoader->measure.total_angle;
         read_2006_angle = 0;
     }
     // 对shoot mode等于SHOOT_STOP的情况特殊处理,直接停止所有电机(紧急停止)
-    if (shoot_cmd_recv.shoot_mode == SHOOT_OFF)
+    // if (shoot_cmd_recv.shoot_mode == SHOOT_OFF)
+    // {
+    //     ServoSetAngle(banji_motor,BANJI_OFF_ANGLE);
+    //     DJIMotorStop(chargeLoader);
+    //     DMMotorStop(rotateChageDarts);
+    // }
+    // else // 恢复运行
+    // {   
+    //     // 扳机的控制
+    //     switch(shoot_cmd_recv.banji_mode)
+    //     {
+    //         case BANJI_OFF:
+    //             ServoSetAngle(banji_motor,BANJI_OFF_ANGLE);
+    //             break;
+    //         case BANJI_ON:
+    //             ServoSetAngle(banji_motor,BANJI_ON_ANGLE);
+    //             break;
+    //         case BANJI_AUTO:
+
+    //             if(flag_arm_sucess == 0 || flag_3508_ready == 0 || !flag_3508_max)
+    //             {
+    //                 ServoSetAngle(banji_motor,0.070);
+    //             }
+    //             // 2006到达目标位置，并且3508归位，并且机械臂执行完毕就发射
+    //             else if(flag_2006_target_ready == true)
+    //             {   
+    //                 // 3508归位 并且 机械臂完成放镖 镖体成功装载
+    //                 // allow==1时允许发射
+    //                 if( flag_3508_back == 1 && flag_arm_sucess == 1 && flag_wait_dart_load_delay == 1 && flag==1)
+    //                 {
+    //                     ServoSetAngle(banji_motor, 0.078);
+    //                     DWT_Delay(2);
+    //                     {
+    //                         flag_arm_sucess = 0;
+    //                         flag_wait_dart_load_delay = 0;
+    //                         flag_3508_ready = 0;
+    //                         flag_3508_back = 0;
+    //                         flag_3508_max=0;
+    //                         reload_auto=1;
+    //                         // flag_loadok = 0;  
+    //                         flag_2006_target_ready = false; 
+    //                         flag_2006_back = false;
+    //                         if(key==1){
+    //                             goal = ANGLE_LOAD;    
+    //                         }
+    //                     }
+    //                 }
+    //                 else
+    //                     ServoSetAngle(banji_motor,0.063);
+    //             }
+    //             break;
+    //         default:
+    //             break;        
+    //     }
+    // }
+
+    // if(f==0){
+    //     init_angle();
+    // }
+    // switch (shoot_cmd_recv.load_mode)
+    // {
+    //     case LOAD_STOP:
+    //         DJIMotorOuterLoop(chargeLoader, SPEED_LOOP); // 切换到速度环
+    //         DJIMotorSetRef(chargeLoader, 0);             // 同时设定参考值为0,这样停止的速度最快
+    //         break;
+    //     // 自动装载模式
+    //     case AUTO_LOAD:
+    //         DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
+
+    //         // 根据传过来的goal参数实现切换    
+    //         switch(goal)
+    //         {   
+    //             // 打击十六米目标
+    //             case ANGLE_16M:
+    //                 if(flag_arm_sucess == 1 && flag_3508_ready == 1){
+    //                     rate = 20000;
+    //                     loader_err = chargeLoader->measure.total_angle - loader_origin_angle - TOTAL_ANGLE_16M;
+    //                     if (loader_err <= -DEAD_LINE_LOAD)
+    //                     {
+    //                         DJIMotorSetRef(chargeLoader, rate);   
+    //                     }
+    //                     else if(loader_err >= DEAD_LINE_LOAD)
+    //                     {
+    //                         DJIMotorSetRef(chargeLoader, -rate);
+    //                     }
+    //                     else
+    //                     {
+    //                         DJIMotorSetRef(chargeLoader, 0);
+    //                         if(flag_3508_max){
+    //                             flag_2006_target_ready = true;
+    //                         }
+    //                     }  
+    //                 } 
+    //                 else{
+    //                     DJIMotorSetRef(chargeLoader, 0);
+    //                 }             
+    //                 break;
+    //             // 打击二十米目标，等待测量
+    //             case ANGLE_25M:
+    //                 if(flag_arm_sucess == 1 && flag_3508_ready == 1){
+    //                     rate = 20000;
+    //                     loader_err = chargeLoader->measure.total_angle - loader_origin_angle - TOTAL_ANGLE_25M;
+    //                     if (loader_err <= -DEAD_LINE_LOAD)
+    //                     {
+    //                         DJIMotorSetRef(chargeLoader, rate);   
+    //                     }
+    //                     else if(loader_err >= DEAD_LINE_LOAD)
+    //                     {
+    //                         DJIMotorSetRef(chargeLoader, -rate);
+    //                     }
+    //                     else
+    //                     {
+    //                         DJIMotorSetRef(chargeLoader, 0);
+    //                         if(flag_3508_max){
+    //                             flag_2006_target_ready = true;
+    //                         }
+    //                     }                          
+    //                 }      
+    //                 else{
+    //                     DJIMotorSetRef(chargeLoader, 0);
+    //                 }     
+    //                 break;
+    //             // 装载角度模式，此处设置为初始化时的角度
+    //             case ANGLE_LOAD:
+    //                 rate = 20000;
+    //                 if ((chargeLoader->measure.total_angle - loader_origin_angle)<= -DEAD_LINE_LOAD)
+    //                 {
+    //                     DJIMotorSetRef(chargeLoader, rate);   
+    //                 }
+    //                 else if((chargeLoader->measure.total_angle - loader_origin_angle)>= DEAD_LINE_LOAD)
+    //                 {
+    //                     DJIMotorSetRef(chargeLoader, -rate);
+    //                 }
+    //                 else
+    //                 {
+    //                     flag_2006_back = true;   
+    //                 }             
+    //                 break;
+    //             default:
+    //                 break;
+    //         }
+    //         break;
+    //     case LOADER_TEST:
+    //         DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
+    //         DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_rate);
+    //         break;
+    //     default:
+    //         break;
+    // }
+
+
+    switch (shoot_cmd_recv.shoot_mode)
     {
-        ServoSetAngle(banji_motor,0.065);
-        DJIMotorStop(loader);
-    }
-    else // 恢复运行
-    {   
-        // 扳机的控制
-        switch(shoot_cmd_recv.banji_mode)
-        {
-            case BANJI_OFF:
-                ServoSetAngle(banji_motor,0.063);
-                break;
-            case BANJI_ON:
-                ServoSetAngle(banji_motor,0.078);
-                break;
-            case BANJI_ON_AUTO:
-
-                if(flag_arm_sucess == 0 || flag_3508_ready == 0 || !flag_3508_max)
-                {
-                    ServoSetAngle(banji_motor,0.070);
-                }
-                // 2006到达目标位置，并且3508归位，并且机械臂执行完毕就发射
-                else if(flag_2006_target_ready == true)
-                {   
-                    // 3508归位 并且 机械臂完成放镖 镖体成功装载
-                    // allow==1时允许发射
-                    if( flag_3508_back == 1 && flag_arm_sucess == 1 && flag_wait_dart_load_delay == 1 && flag==1)
-                    {
-                        ServoSetAngle(banji_motor, 0.078);
-                        DWT_Delay(2);
-                        {
-                            flag_arm_sucess = 0;
-                            flag_wait_dart_load_delay = 0;
-                            flag_3508_ready = 0;
-                            flag_3508_back = 0;
-                            flag_3508_max=0;
-                            reload_auto=1;
-                            // flag_loadok = 0;  
-                            flag_2006_target_ready = false; 
-                            flag_2006_back = false;
-                            if(key==1){
-                                goal = ANGLE_LOAD;    
-                            }
-                                      
-                        }
-
-                    }
-                    else
-                        ServoSetAngle(banji_motor,0.063);
-                }
-                break;
-            default:
-                break;        
-        }
-        DJIMotorEnable(loader);
-    }
-
-    if(f==0){
-        init_angle();
-    }
-    switch (shoot_cmd_recv.load_mode)
-    {
-        // 停止拨盘
-        case LOAD_STOP:
-            DJIMotorOuterLoop(loader_3, SPEED_LOOP); // 切换到速度环
-            DJIMotorSetRef(loader_3, 0);             // 同时设定参考值为0,这样停止的速度最快
+        case SHOOT_OFF:
+            ServoSetAngle(banji_motor,BANJI_OFF_ANGLE);
+            DJIMotorStop(chargeLoader);
+            DMMotorStop(rotateChageDarts);
             break;
-        // 自动装载模式
-        case AUTO_LOAD:
-            DJIMotorOuterLoop(loader_3, SPEED_LOOP);
-    
-            if(f&&reload_auto&&!flag_arm_sucess){
-                DJIMotorOuterLoop(loader, ANGLE_LOOP);
-                DJIMotorOuterLoop(loader_1, ANGLE_LOOP);
-                DJIMotorOuterLoop(loader_2, ANGLE_LOOP);
-
-                switch (key)
-                {
-                case 1://第一发不用换弹
-                    if(flag_3508_ready){
-                        key=4;
-                        reload_auto=0;
-                        flag_arm_sucess=1;                        
-                    }
-                    break;
-                case 2: //第二发左上
-                    if(step==0){
-                        DJIMotorSetRef(loader, TOTAL_ANGLE_C2);
-                        DJIMotorSetRef(loader_1, TOTAL_ANGLE_C2);
-                        if(loader->measure.total_angle>=TOTAL_ANGLE_C2&&loader_1->measure.total_angle>=TOTAL_ANGLE_C2){
-                            step++;
-                        }
-                    }
-                    else if(step==1){
-                        DJIMotorSetRef(loader_2, TOTAL_ANGLE_L);
-                        if(loader_2->measure.total_angle>=TOTAL_ANGLE_L){
-                        step++;  
-                        }
-                    }    
-                    else if(step==2){
-                        DJIMotorSetRef(loader, TOTAL_ANGLE_D1);
-                        DJIMotorSetRef(loader_1, TOTAL_ANGLE_D1);
-                        if(loader->measure.total_angle>=TOTAL_ANGLE_D1&&loader_1->measure.total_angle>=TOTAL_ANGLE_D1){
-                            step++;
-                            relay_control(2,1);
-                            relay_control(1,0);
-                        }
-                        
-                    }
-                    else if(step==3){
-                        DJIMotorSetRef(loader, TOTAL_ANGLE_W);
-                        DJIMotorSetRef(loader_1, TOTAL_ANGLE_W);
-                        if(loader->measure.total_angle<=TOTAL_ANGLE_W&&loader_1->measure.total_angle<=TOTAL_ANGLE_W){
-                            step++;
-                        }
-                    }
-                    else if(step==4){
-                        DJIMotorSetRef(loader_2, TOTAL_ANGLE_C1);
-                        if(loader_2->measure.total_angle<=TOTAL_ANGLE_C1){
-                        step++;  
-                        }
-                    }
-                    else if(step==5){
-                        if(flag_3508_ready){                        
-                            DJIMotorSetRef(loader, TOTAL_ANGLE_Loc);
-                            DJIMotorSetRef(loader_1, TOTAL_ANGLE_Loc);
-                            if(loader->measure.total_angle>=TOTAL_ANGLE_Loc&&loader_1->measure.total_angle>=TOTAL_ANGLE_Loc){
-                                relay_control(2,0);
-                                step++;
-                            }
-                        }
-                    }
-                    else if(step==6){         
-                        f=0;
-                        reload_auto=0;
-                        step=0;
-                        key++;
-                        flag_arm_sucess=1;
-                        
-                    }
-                    break;
-                case 3:
-                    if(step==0){
-                        DJIMotorSetRef(loader, TOTAL_ANGLE_C2);
-                        DJIMotorSetRef(loader_1, TOTAL_ANGLE_C2);
-                        if(loader->measure.total_angle>=TOTAL_ANGLE_C2&&loader_1->measure.total_angle>=TOTAL_ANGLE_C2){
-                            step++;
-                        }
-                    }
-                    else if(step==1){
-                        DJIMotorSetRef(loader_2, TOTAL_ANGLE_L);
-                        if(loader_2->measure.total_angle>=TOTAL_ANGLE_L){
-                            step++;  
-                            relay_control(3,1);
-                        }
-                    }    
-                    else if(step==2){
-                        DJIMotorSetRef(loader, TOTAL_ANGLE_D2);
-                        DJIMotorSetRef(loader_1, TOTAL_ANGLE_D2);
-                        if(loader->measure.total_angle>=TOTAL_ANGLE_D2&&loader_1->measure.total_angle>=TOTAL_ANGLE_D2){
-                            step++;
-                            
-                        }
-                        
-                    }
-                    else if(step==3){
-                        DJIMotorSetRef(loader, TOTAL_ANGLE_W);
-                        DJIMotorSetRef(loader_1, TOTAL_ANGLE_W);
-                        if(loader->measure.total_angle<=TOTAL_ANGLE_W&&loader_1->measure.total_angle<=TOTAL_ANGLE_W){
-                            step++;
-                        }
-                    }
-                    else if(step==4){
-                        DJIMotorSetRef(loader_2, TOTAL_ANGLE_C1);
-                        if(loader_2->measure.total_angle<=TOTAL_ANGLE_C1){
-                        step++;  
-                        }
-                    }
-                    else if(step==5){
-                        if(flag_3508_ready){                        
-                            DJIMotorSetRef(loader, TOTAL_ANGLE_Loc);
-                            DJIMotorSetRef(loader_1, TOTAL_ANGLE_Loc);
-                            if(loader->measure.total_angle>=TOTAL_ANGLE_Loc&&loader_1->measure.total_angle>=TOTAL_ANGLE_Loc){
-                                relay_control(3,0);
-                                step++;
-                            }
-                        }
-                    }
-                    else if(step==6){                     
-                        f=0;
-                        reload_auto=0;
-                        step=0;
-                        key++;
-                        flag_arm_sucess=1;
-                    }
-                    break;
-                case 4:
-                    if(step==0){
-                        DJIMotorSetRef(loader, TOTAL_ANGLE_C2);
-                        DJIMotorSetRef(loader_1, TOTAL_ANGLE_C2);
-                        if(loader->measure.total_angle>=TOTAL_ANGLE_C2&&loader_1->measure.total_angle>=TOTAL_ANGLE_C2){
-                            step++;
-                        }
-                    }
-                    else if(step==1){
-                        DJIMotorSetRef(loader_2, TOTAL_ANGLE_R);
-                        if(loader_2->measure.total_angle<=TOTAL_ANGLE_R){
-                            step++;  
-                            relay_control(3,1);                           
-                        }
-                    }    
-                    else if(step==2){
-                        DJIMotorSetRef(loader, TOTAL_ANGLE_D2);
-                        DJIMotorSetRef(loader_1, TOTAL_ANGLE_D2);
-                        if(loader->measure.total_angle>=TOTAL_ANGLE_D2&&loader_1->measure.total_angle>=TOTAL_ANGLE_D2){
-                            step++;
-                        }
-                        
-                    }
-                    else if(step==3){
-                        DJIMotorSetRef(loader, TOTAL_ANGLE_W);
-                        DJIMotorSetRef(loader_1, TOTAL_ANGLE_W);
-                        if(loader->measure.total_angle<=TOTAL_ANGLE_W&&loader_1->measure.total_angle<=TOTAL_ANGLE_W){
-                            step++;
-                        }
-                    }
-                    else if(step==4){
-                        DJIMotorSetRef(loader_2, TOTAL_ANGLE_C1);
-                        if(loader_2->measure.total_angle>=TOTAL_ANGLE_C1){
-                            step++;  
-                        }
-                    }
-                    else if(step==5){
-                        if(flag_3508_ready){                        
-                            DJIMotorSetRef(loader, TOTAL_ANGLE_Loc);
-                            DJIMotorSetRef(loader_1, TOTAL_ANGLE_Loc);
-                            if(loader->measure.total_angle>=TOTAL_ANGLE_Loc&&loader_1->measure.total_angle>=TOTAL_ANGLE_Loc){
-                                relay_control(3,0);
-                                step++;
-                            }
-                        }
-                    }
-                    else if(step==6){             
-                        f=0;
-                        reload_auto=0;
-                        step=0;
-                        key=1;
-                        flag_arm_sucess=1;
-                    }
-                    break;
-                default:
-                    break;
-                }
-            }
-            // 根据传过来的goal参数实现切换    
-            switch(goal)
-            {   
-                // 打击十六米目标
-                case ANGLE_16M:
-                    if(flag_arm_sucess == 1 && flag_3508_ready == 1){
-                        rate = 20000;
-                        loader_err = loader_3->measure.total_angle - loader_origin_angle - TOTAL_ANGLE_16M;
-                        if (loader_err <= -DEAD_LINE_LOAD)
-                        {
-                            DJIMotorSetRef(loader_3, rate);   
-                        }
-                        else if(loader_err >= DEAD_LINE_LOAD)
-                        {
-                            DJIMotorSetRef(loader_3, -rate);
-                        }
-                        else
-                        {
-                            DJIMotorSetRef(loader_3, 0);
-                            if(flag_3508_max){
-                                flag_2006_target_ready = true;
-                            }
-                        }  
-                    } 
-                    else{
-                        DJIMotorSetRef(loader_3, 0);
-                    }             
-                    break;
-                // 打击二十米目标，等待测量
-                case ANGLE_25M:
-                    if(flag_arm_sucess == 1 && flag_3508_ready == 1){
-                        rate = 20000;
-                        loader_err = loader_3->measure.total_angle - loader_origin_angle - TOTAL_ANGLE_25M;
-                        if (loader_err <= -DEAD_LINE_LOAD)
-                        {
-                            DJIMotorSetRef(loader_3, rate);   
-                        }
-                        else if(loader_err >= DEAD_LINE_LOAD)
-                        {
-                            DJIMotorSetRef(loader_3, -rate);
-                        }
-                        else
-                        {
-                            DJIMotorSetRef(loader_3, 0);
-                            if(flag_3508_max){
-                                flag_2006_target_ready = true;
-                            }
-                        }                          
-                    }      
-                    else{
-                        DJIMotorSetRef(loader_3, 0);
-                    }     
-                    break;
-                // 装载角度模式，此处设置为初始化时的角度
-                case ANGLE_LOAD:
-                    rate = 20000;
-                    if ((loader_3->measure.total_angle - loader_origin_angle)<= -DEAD_LINE_LOAD)
-                    {
-                        DJIMotorSetRef(loader_3, rate);   
-                    }
-                    else if((loader_3->measure.total_angle - loader_origin_angle)>= DEAD_LINE_LOAD)
-                    {
-                        DJIMotorSetRef(loader_3, -rate);
-                    }
-                    else
-                    {
-                        DJIMotorSetRef(loader, 0);
-                        flag_2006_back = true;   
-                        
-                    }             
-                    break;
-                default:
-                    break;
-            }
-        case TEST:
-            DJIMotorOuterLoop(loader_3, SPEED_LOOP);
-            DJIMotorSetRef(loader_3, shoot_cmd_recv.shoot_rate);
-            break;
-
-
-    case LOAD_NORMAL:
-        DJIMotorOuterLoop(loader_3, SPEED_LOOP);
-        DJIMotorSetRef(loader_3, shoot_cmd_recv.shoot_rate);
-        relay_control(2,1);
-        if(f&&reload){
-            DJIMotorOuterLoop(loader, ANGLE_LOOP);
-            DJIMotorOuterLoop(loader_1, ANGLE_LOOP);
-            DJIMotorOuterLoop(loader_2, ANGLE_LOOP);
-            switch (key)
+        case SHOOT_TEST:
+            switch (shoot_cmd_recv.banji_mode)
             {
-            case 1://第一发不用换弹
-                key++;
-                reload=0;
-                // flag_arm_sucess=1;
-                break;
-            case 2: //第二发左上
-                if(step==0){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_C2);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_C2);
-                    if(loader->measure.total_angle>=TOTAL_ANGLE_C2&&loader_1->measure.total_angle>=TOTAL_ANGLE_C2){
-                        step++;
-                    }
-                }
-                else if(step==1){
-                    DJIMotorSetRef(loader_2, TOTAL_ANGLE_L);
-                    if(loader_2->measure.total_angle>=TOTAL_ANGLE_L){
-                    step++;  
-                    }
-                }    
-                else if(step==2){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_D1);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_D1);
-                    if(loader->measure.total_angle>=TOTAL_ANGLE_D1&&loader_1->measure.total_angle>=TOTAL_ANGLE_D1){
-                        step++;
-                        relay_control(2,1);
-                    }
-                    
-                }
-                else if(step==3){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_W);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_W);
-                    if(loader->measure.total_angle<=TOTAL_ANGLE_W&&loader_1->measure.total_angle<=TOTAL_ANGLE_W){
-                        step++;
-                    }
-                }
-                else if(step==4){
-                    DJIMotorSetRef(loader_2, TOTAL_ANGLE_C1);
-                    if(loader_2->measure.total_angle<=TOTAL_ANGLE_C1){
-                    step++;  
-                    }
-                }
-                else if(step==5){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_Loc);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_Loc);
-                    if(loader->measure.total_angle>=TOTAL_ANGLE_Loc&&loader_1->measure.total_angle>=TOTAL_ANGLE_Loc){
-                        step++;
-                        DWT_Delay(1);
-                        // flag_arm_sucess=1;
-                        relay_control(2,0);
-                    }
-                }
-                else if(step==6){
-                    //自动的话需等待 flag_wait_dart_load_delay或者3508归位
-                    f=0;
-                    reload=0;
-                    step=0;
-                    key++;
-                }
-                break;
-            case 3:
-                if(step==0){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_C2);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_C2);
-                    if(loader->measure.total_angle>=TOTAL_ANGLE_C2&&loader_1->measure.total_angle>=TOTAL_ANGLE_C2){
-                        step++;
-                    }
-                }
-                else if(step==1){
-                    DJIMotorSetRef(loader_2, TOTAL_ANGLE_L);
-                    if(loader_2->measure.total_angle>=TOTAL_ANGLE_L){
-                    step++;  
-                    }
-                }    
-                else if(step==2){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_D2);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_D2);
-                    if(loader->measure.total_angle>=TOTAL_ANGLE_D2&&loader_1->measure.total_angle>=TOTAL_ANGLE_D2){
-                        step++;
-                        relay_control(3,1);
-                    }
-                    
-                }
-                else if(step==3){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_W);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_W);
-                    if(loader->measure.total_angle<=TOTAL_ANGLE_W&&loader_1->measure.total_angle<=TOTAL_ANGLE_W){
-                        step++;
-                    }
-                }
-                else if(step==4){
-                    DJIMotorSetRef(loader_2, TOTAL_ANGLE_C1);
-                    if(loader_2->measure.total_angle<=TOTAL_ANGLE_C1){
-                    step++;  
-                    }
-                }
-                else if(step==5){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_Loc);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_Loc);
-                    if(loader->measure.total_angle>=TOTAL_ANGLE_Loc&&loader_1->measure.total_angle>=TOTAL_ANGLE_Loc){
-                        step++;
-                        DWT_Delay(1);
-                        // flag_arm_sucess=1;
-                        relay_control(3,0);
-                    }
-                }
-                else if(step==6){
-                    //自动的话需等待 flag_wait_dart_load_delay或者3508归位
-                    f=0;
-                    reload=0;
-                    step=0;
-                    key++;
-                }
-                break;
-            case 4:
-                if(step==0){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_C2);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_C2);
-                    if(loader->measure.total_angle>=TOTAL_ANGLE_C2&&loader_1->measure.total_angle>=TOTAL_ANGLE_C2){
-                        step++;
-                    }
-                }
-                else if(step==1){
-                    DJIMotorSetRef(loader_2, TOTAL_ANGLE_R);
-                    if(loader_2->measure.total_angle<=TOTAL_ANGLE_R){
-                        step++;  
-                    }
-                }    
-                else if(step==2){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_D2);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_D2);
-                    if(loader->measure.total_angle>=TOTAL_ANGLE_D2&&loader_1->measure.total_angle>=TOTAL_ANGLE_D2){
-                        step++;
-                        relay_control(3,1);
-                    }
-                    
-                }
-                else if(step==3){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_W);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_W);
-                    if(loader->measure.total_angle<=TOTAL_ANGLE_W&&loader_1->measure.total_angle<=TOTAL_ANGLE_W){
-                        step++;
-                    }
-                }
-                else if(step==4){
-                    DJIMotorSetRef(loader_2, TOTAL_ANGLE_C1);
-                    if(loader_2->measure.total_angle>=TOTAL_ANGLE_C1){
-                    step++;  
-                    }
-                }
-                else if(step==5){
-                    DJIMotorSetRef(loader, TOTAL_ANGLE_Loc);
-                    DJIMotorSetRef(loader_1, TOTAL_ANGLE_Loc);
-                    if(loader->measure.total_angle>=TOTAL_ANGLE_Loc&&loader_1->measure.total_angle>=TOTAL_ANGLE_Loc){
-                        step++;
-                        DWT_Delay(1);
-                        // flag_arm_sucess=1;
-                        relay_control(3,0);
-                    }
-                }
-                else if(step==6){
-                    //自动的话需等待 flag_wait_dart_load_delay或者3508归位
-                    f=0;
-                    reload=0;
-                    step=0;
-                    key=1;
-                }
-                break;
-            default:
-                break;
+                case BANJI_OFF:
+                    ServoSetAngle(banji_motor,BANJI_OFF_ANGLE);
+                    break;
+                case BANJI_ON:
+                    ServoSetAngle(banji_motor,BANJI_ON_ANGLE);
+                    break;
+                default:
+                    break;
             }
-        }
-        break;
-    case LOAD_REVERSE:
-        DJIMotorOuterLoop(loader, SPEED_LOOP);
-        DJIMotorSetRef(loader, shoot_cmd_recv.shoot_rate);
-        break;
-    default:
-        break;
+            switch (shoot_cmd_recv.load_mode)
+            {
+                case LOAD_STOP:
+                    DJIMotorOuterLoop(chargeLoader, SPEED_LOOP); // 切换到速度环
+                    DJIMotorSetRef(chargeLoader, 0);             // 同时设定
+                    break;
+                case LOADER_TEST:
+                    DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
+                    DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_rate);
+                    break;
+                case AUTO_LOAD:
+                    /* code */
+                    break;
+                default:
+                    break;
+            }
+            switch (shoot_cmd_recv.rotate_mode)
+            {
+                case ROTATE_STOP:
+                    DMMotorStop(rotateChageDarts);
+                    break;
+                case ROTATE_TEST:
+                    float tff = calculateTff();
+                    DMMotorSetRef(rotateChageDarts, shoot_cmd_recv.rotate_rate, tff);
+                    break;
+                case ROTATE_AUTO:
+                    /* code */
+                    break;
+                default:
+                    break;
+            }
+            DMMotorSetRef(rotateChageDarts, shoot_cmd_recv.rotate_rate, 0);
 
+            break;
+        case SHOOT_AUTO:
+            //这是整个流程的 auto
+            /* code */
+            break;
+        default:
+            break;
     }
-
 
     // 反馈数据,目前暂时没有要设定的反馈数据,后续可能增加应用离线监测以及卡弹反馈
     PubPushMessage(shoot_pub, (void *)&shoot_feedback_data);

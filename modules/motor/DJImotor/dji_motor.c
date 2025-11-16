@@ -199,8 +199,9 @@ DJIMotorInstance *DJIMotorInit(Motor_Init_Config_s *config)
     instance->motor_type = config->motor_type;
     instance->motor_settings = config->controller_setting_init_config;
 
-    if(config->motor_type == M2006)
+    if(config->storage_type == USE_STORAGE)
     {
+        instance->storage_type = USE_STORAGE;
         instance->measure.total_angle = DjiMotorTotalAngleSet[idx];
         instance->measure.total_round = instance->measure.total_angle / 360.0f;
     }
@@ -290,7 +291,7 @@ void DJIMotorControl()
         motor_setting = &motor->motor_settings;
         motor_controller = &motor->motor_controller;
         measure = &motor->measure;
-        if (motor->motor_type == M2006)
+        if (motor->storage_type == USE_STORAGE)
         {
             writeDjiMotorAngle(i, (int32_t)(measure->total_angle)); // 存储电机总角度
             // writeDjiMotorAngle(i, (int32_t)0); // 存储电机总角度

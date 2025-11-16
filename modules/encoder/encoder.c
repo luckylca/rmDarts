@@ -170,7 +170,7 @@ void encoder_self5_check(void)
 //-------------------------------------------------------------------------------------------------------------------
 void encoder_init_spi(void)
 {
-	// encoder_self5_check();     //debug 暂时注释掉自检
+	encoder_self5_check();     //debug 暂时注释掉自检
 	encoder_spi_w_reg_byte(DIR_REG,0x00);//设置旋转方向 正转数值变小：0x00   反转数值变大：0x80
 	set_zero_position_spi(0);                   //设置零偏
 }

@@ -26,11 +26,6 @@
 #define YAW_ALIGN_ANGLE (YAW_CHASSIS_ALIGN_ECD * ECD_ANGLE_COEF_DJI) // 对齐时的角度,0-360
 #define PTICH_HORIZON_ANGLE (PITCH_HORIZON_ECD * ECD_ANGLE_COEF_DJI) // pitch水平时电机的角度,0-360
 
-#define armor_f (YAW_CHASSIS_ALIGN_ECD * ECD_ANGLE_COEF_DJI)
-#define armor_l (1118 * ECD_ANGLE_COEF_DJI)
-#define armor_r (5120 * ECD_ANGLE_COEF_DJI)
-#define armor_b (3140 * ECD_ANGLE_COEF_DJI)
-
 /* cmd应用包含的模块实例指针和交互信息存储*/
 #ifdef GIMBAL_BOARD // 对双板的兼容,条件编译
 #include "can_comm.h"
@@ -46,8 +41,6 @@ static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反�
 
 static RC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
 static volatile double *F_data = NULL;
-double F_data_1 = 0;
-double F_data_2 = 0;
 static Vision_Recv_s *vision_recv_data; // 视觉接收数据指针,初始化时返回
 static Vision_Send_s vision_send_data;  // 视觉发送数据
 
@@ -125,14 +118,6 @@ PIDInstance Vision_PID = {
     .IntegralLimit = 1000,
     .MaxOut = 2,
 };
-float out, last_in;
-float T=0.1;
-float forward_feed(float in)
-{
-    out=(in-last_in)/T+in;
-    last_in=in;
-    return out;
-}
 
 void RobotCMDInit()
 {
@@ -205,21 +190,23 @@ static void RemoteControlSet()
     // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
     if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 
     {
-        chassis_cmd_send.chassis_mode = TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
-        shoot_cmd_send.shoot_mode = SHOOT_ON;
-        shoot_cmd_send.load_mode = TEST;
+        chassis_cmd_send.chassis_mode = CHASSIS_TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
+        shoot_cmd_send.shoot_mode = SHOOT_TEST;
+        shoot_cmd_send.rotate_mode = ROTATE_TEST;
+        shoot_cmd_send.load_mode = LOADER_TEST;
+        gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
         if (rc_data[TEMP].rc.dial > 0 )// 拨轮打开发射
         {
-
             shoot_cmd_send.banji_mode = BANJI_ON;
         }
         else
         {
-            // 默认锁定
             shoot_cmd_send.banji_mode = BANJI_OFF;
         }
-        shoot_cmd_send.shoot_rate = 60.0f * (float)rc_data[TEMP].rc.rocker_l1;    //参数  要改
+        shoot_cmd_send.shoot_rate = 60.0f * (float)rc_data[TEMP].rc.rocker_l1;    //参数要改
         chassis_cmd_send.v1 = 30.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
+        gimbal_cmd_send.yaw += 0.001f * (float)rc_data[TEMP].rc.rocker_l_;//底盘的位置
+        shoot_cmd_send.rotate_rate = 30.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
     }
     else if (switch_is_down(rc_data[TEMP].rc.switch_right)) // 
     {
@@ -228,12 +215,15 @@ static void RemoteControlSet()
         shoot_cmd_send.banji_mode = BANJI_OFF;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
         shoot_cmd_send.load_mode = LOAD_STOP;
+        shoot_cmd_send.rotate_mode = ROTATE_STOP;
     }
     else if (switch_is_up(rc_data[TEMP].rc.switch_right))
     {
         chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
-        shoot_cmd_send.shoot_mode = SHOOT_ON;
+        shoot_cmd_send.shoot_mode = SHOOT_AUTO;
         shoot_cmd_send.load_mode = AUTO_LOAD;
+        shoot_cmd_send.banji_mode = BANJI_AUTO;
+        shoot_cmd_send.rotate_mode = ROTATE_AUTO;
         //初始化2006
         if(flag_init_goal==false)
         {
@@ -280,115 +270,24 @@ static void RemoteControlSet()
             shoot_cmd_send.shoot_rate = 0;
 
         // shoot_cmd_send.shoot_rate += 0.1f * (float)rc_data[TEMP].rc.rocker_r_;    //参数  要改
-        chassis_cmd_send.v1 = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
+        // chassis_cmd_send.v1 = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
     }
 
-
-    if(switch_is_up(rc_data[TEMP].rc.switch_right))
-    {
-        shoot_cmd_send.banji_mode = BANJI_ON_AUTO;
-        //自动时控制发射
-        if(rc_data[TEMP].rc.dial > 0){
-            flag=1;
-        }
-        else{
-            flag=0;
-        }
-    }
-    else if (rc_data[TEMP].rc.dial > 0 )// 拨轮打开发射
-    {
-
-        shoot_cmd_send.banji_mode = BANJI_ON;
-    }
-    else
-    {
-        // 默认锁定
-        shoot_cmd_send.banji_mode = BANJI_OFF;
-    }
-
-    // 云台参数,确定云台控制数据
+    //下面是对每个模式的细化设置，就是在 TEST 模式下的对某个模块做其他测试
     if (switch_is_mid(rc_data[TEMP].rc.switch_left)) // 
     {   
-        gimbal_cmd_send.gimbal_mode = TSET;
-        if(gimbal_cmd_send.yaw>30)
-        {
-            gimbal_cmd_send.yaw=30;
-        }
-        else if (gimbal_cmd_send.yaw<-50)
-        {
-            gimbal_cmd_send.yaw=-50;
-        }
-
-        if(gimbal_cmd_send.bottom>30)
-        {
-            gimbal_cmd_send.bottom=30;
-        }
-        else if (gimbal_cmd_send.bottom<-30)
-        {
-            gimbal_cmd_send.bottom=-30;
-        }
-        gimbal_cmd_send.yaw += 0.001f * (float)rc_data[TEMP].rc.rocker_l_;
-        // gimbal_cmd_send.bottom += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
-
-        // if(rc_data[TEMP].rc.rocker_l_>400)
-        // {
-        //     Change_bottom_position(25);
-        // }
-        // else if(rc_data[TEMP].rc.rocker_l_<-400)
-        // {
-        //     Change_bottom_position(16);
-        // }
-        // else
-        // {
-        //     Change_bottom_position(0);
-        // }
-        
-        // gimbal_cmd_send.yaw = yaw_control_servo;
-        
-
 
     }
-
     else if (switch_is_down(rc_data[TEMP].rc.switch_left))// || vision_recv_data->target_state == NO_TARGET
     {
-        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
-        chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
-        shoot_cmd_send.shoot_mode = SHOOT_OFF;
-        shoot_cmd_send.banji_mode = BANJI_OFF;
-        shoot_cmd_send.load_mode = LOAD_STOP;
-        LOGERROR("[CMD] emergency stop!");   
+
     }
-    // 云台软件限位
-    // 发射参数
     else if (switch_is_up(rc_data[TEMP].rc.switch_left)) // 左 侧开关状态[上],
     {
-        gimbal_cmd_send.gimbal_mode = TSET;
-        gimbal_cmd_send.yaw += 0.001f * (float)rc_data[TEMP].rc.rocker_l_;
-        gimbal_cmd_send.bottom += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
-
-        if(gimbal_cmd_send.yaw>30)
-        {
-            gimbal_cmd_send.yaw=30;
-        }
-        else if (gimbal_cmd_send.yaw<-30)
-        {
-            gimbal_cmd_send.yaw=-30;
-        }
-
-        if(gimbal_cmd_send.bottom>30)
-        {
-            gimbal_cmd_send.bottom=30;
-        }
-        else if (gimbal_cmd_send.bottom<-30)
-        {
-            gimbal_cmd_send.bottom=-30;
-        }
-        
-        
-        // gimbal_cmd_send.gimbal_mode = AUTO_DART;
+        //自动模式
     }                                       
 
-  
+
 }
 static void VisionControl()
 {
@@ -403,7 +302,7 @@ static void MouseKeySet()
 
 static void ImageRoadSet()
 {
-   
+
 }                                                   
 
 

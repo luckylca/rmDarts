@@ -110,6 +110,13 @@ typedef enum
     G6220,
 } Motor_Type_e;
 
+/* 电机类型枚举 */
+typedef enum
+{
+    NO_STORAGE = 0,
+    USE_STORAGE,
+} STORAGE_Type_e;
+
 /**
  * @brief 电机控制器初始化结构体,包括三环PID的配置以及两个反馈数据来源指针
  *        如果不需要某个控制环,可以不设置对应的pid config
@@ -135,6 +142,7 @@ typedef struct
     Motor_Control_Setting_s controller_setting_init_config;
     Motor_Type_e motor_type;
     CAN_Init_Config_s can_init_config;
+    STORAGE_Type_e storage_type;
 } Motor_Init_Config_s;
 
 #endif // !MOTOR_DEF_H

@@ -322,6 +322,7 @@ static void FLostCallback(void *id)
 
 double* F_Init(UART_HandleTypeDef *F_usart_handle)
 {
+    memset(F_data,0,sizeof(F_data));
     USART_Init_Config_s conf_F;
     conf_F.module_callback = F_RxCallback;
     conf_F.usart_handle = F_usart_handle;

@@ -82,4 +82,7 @@ void DMMotorStop(DMMotorInstance *motor);
 void DMMotorCaliEncoder(DMMotorInstance *motor);
 void DMMotorControlInit();
 
+float degree_to_radian_dm(float *angle);
+float radian_to_degree_dm(float *angle);
+
 #endif // !DMMOTOR

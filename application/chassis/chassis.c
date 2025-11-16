@@ -174,17 +174,6 @@ void ChassisTask()
 #ifdef CHASSIS_BOARD
     chassis_cmd_recv = *(Chassis_Ctrl_Cmd_s *)CANCommGet(chasiss_can_comm);
 #endif // CHASSIS_BOARD
- 
-    if (chassis_cmd_recv.chassis_mode == CHASSIS_ZERO_FORCE)
-    { // 如果出现重要模块离线或遥控器设置为急停,让电机停止
-        DJIMotorStop(motor_lf);
-        DJIMotorStop(motor_rf);
-    }
-    else
-    {
-        DJIMotorEnable(motor_lf);
-        DJIMotorEnable(motor_rf);
-    }
     
     // 正常工作,初始化左右电机初始角度
     if(read_original_3508_angle==1)
@@ -194,10 +183,14 @@ void ChassisTask()
         read_original_3508_angle = 0;
     }
 
-    // 根据控制模式设定旋转速度
+    // 根据控制模式设置蓄力状态
     switch (chassis_cmd_recv.chassis_mode)
     {
-        case TEST: 
+        case CHASSIS_ZERO_FORCE:
+            DJIMotorSetRef(motor_lf, 0);
+            DJIMotorSetRef(motor_rf, 0);
+            break;
+        case CHASSIS_TEST: 
             DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);//2000 左右能动
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
             break;

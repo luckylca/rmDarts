@@ -59,7 +59,8 @@
     "coeffs"
 ],
 "cortex-debug.armToolchainPath": "/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin",
-"stm32-for-vscode.openOCDPath": "/opt/homebrew/bin/openocd",
-"stm32-for-vscode.armToolchainPath": "/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin",
-"cortex-debug.variableUseNaturalFormat": false
+"stm32-for-vscode.openOCDPath": "D:\\OpenOCD\\bin\\openocd.EXE",
+"stm32-for-vscode.armToolchainPath": false,
+"cortex-debug.variableUseNaturalFormat": false,
+"stm32-for-vscode.makePath": false
 }

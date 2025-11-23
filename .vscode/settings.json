@@ -35,7 +35,8 @@
         "encoder_task.h": "c",
         "robot_task.h": "c",
         "stdlib.h": "c",
-        "bmi088.h": "c"
+        "bmi088.h": "c",
+        "controller.h": "c"
     },
     // "terminal.integrated.defaultProfile.windows": "mysys2-mingw64", // 若希望为默认终端可以加入这一句
     "terminal.integrated.profiles.windows": {
@@ -59,8 +60,8 @@
     "coeffs"
 ],
 "cortex-debug.armToolchainPath": "/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin",
-"stm32-for-vscode.openOCDPath": "D:\\OpenOCD\\bin\\openocd.EXE",
-"stm32-for-vscode.armToolchainPath": false,
+"stm32-for-vscode.openOCDPath": "/opt/homebrew/bin/openocd",
+"stm32-for-vscode.armToolchainPath": "/Applications/ArmGNUToolchain/14.3.rel1/arm-none-eabi/bin",
 "cortex-debug.variableUseNaturalFormat": false,
-"stm32-for-vscode.makePath": false
+"stm32-for-vscode.makePath": "/usr/bin/make"
 }

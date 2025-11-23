@@ -220,3 +220,67 @@ float PID_increment(PIDInstance *PID, float measure, float ref)
     f_Output_Limit(PID);
     return PID->Output;
 }
+/**
+ * @brief          KI的内容计算，主要是为了适配 dm 电机的 MIT 模式
+ * @param[in]      PID结构体
+ * @param[in]      测量值
+ * @param[in]      期望值
+ * @retval         返回空
+ */
+float KICalculate(PIDInstance *pid, float measure, float ref)
+{
+    // 堵转检测
+    if (pid->Improve & PID_ErrorHandle)
+        f_PID_ErrorHandle(pid);
+
+    pid->dt = DWT_GetDeltaT(&pid->DWT_CNT); // 获取两次pid计算的时间间隔,用于积分和微分
+
+    // 保存上次的测量值和误差,计算当前error
+    pid->Measure = measure;
+    pid->Ref = ref;
+    pid->Err = pid->Ref - pid->Measure;
+
+    // 如果在死区外,则计算PID
+    if (abs(pid->Err) > pid->DeadBand)
+    {
+        // 基本的pid计算,使用位置式
+        pid->ITerm = pid->Ki * pid->Err * pid->dt;
+
+        // 梯形积分
+        if (pid->Improve & PID_Trapezoid_Intergral)
+            f_Trapezoid_Intergral(pid);
+        // 变速积分
+        if (pid->Improve & PID_ChangingIntegrationRate)
+            f_Changing_Integration_Rate(pid);
+        // 微分先行
+        if (pid->Improve & PID_Derivative_On_Measurement)
+            f_Derivative_On_Measurement(pid);
+        // 微分滤波器
+        if (pid->Improve & PID_DerivativeFilter)
+            f_Derivative_Filter(pid);
+        // 积分限幅
+        if (pid->Improve & PID_Integral_Limit)
+            f_Integral_Limit(pid);
+
+        pid->Iout += pid->ITerm;                         // 累加积分
+        pid->Output = pid->Iout;// 计算输出
+
+        // 输出滤波
+        if (pid->Improve & PID_OutputFilter)
+            f_Output_Filter(pid);
+    }
+    else // 进入死区, 则清空积分和输出
+    {
+        pid->Output = 0;
+        pid->ITerm = 0;
+    }
+
+    // 保存当前数据,用于下次计算
+    pid->Last_Measure = pid->Measure;
+    pid->Last_Output = pid->Output;
+    pid->Last_Dout = pid->Dout;
+    pid->Last_Err = pid->Err;
+    pid->Last_ITerm = pid->ITerm;
+
+    return pid->Output;
+}

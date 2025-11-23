@@ -235,10 +235,16 @@ void ShootInit()
             .angle_PID = {
                 .Kp = 3,
                 .Kd = 0.3,
+                .Ki = 0.1,
+                .Improve = PID_Integral_Limit || PID_ChangingIntegrationRate || PID_Trapezoid_Intergral,
+                .IntegralLimit = 1,
             },
             .speed_PID = {
                 .Kp = 3,
                 .Kd = 0.3,
+                .Ki = 0.1,
+                .Improve = PID_Integral_Limit || PID_ChangingIntegrationRate || PID_Trapezoid_Intergral,
+                .IntegralLimit = 1,
             },
         },
         .motor_type = G6220  // 达妙电机类型

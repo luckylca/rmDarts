@@ -135,4 +135,5 @@ void PIDInit(PIDInstance *pid, PID_Init_Config_s *config);
  */
 float PIDCalculate(PIDInstance *pid, float measure, float ref);
 float PID_increment(PIDInstance *PID, float measure, float ref);
+float KICalculate(PIDInstance *pid, float measure, float ref);
 #endif

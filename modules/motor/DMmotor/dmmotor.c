@@ -132,10 +132,11 @@ void DMMotorOuterLoop(DMMotorInstance *motor, Closeloop_Type_e type)
     motor->motor_settings.outer_loop_type = type;
 }
 
+
 //@Todo: 目前只实现了力控，更多位控PID等请自行添加
 void DMMotorTask(void const *argument)
 {
-    float pid_ref, set, tffSet, kp, kd;
+    float pid_ref, set, tffSet, kp, kd, ki_out;
     DMMotorInstance *motor = (DMMotorInstance *)argument;
     // DM_Motor_Measure_s *measure = &motor->measure;
     Motor_Control_Setting_s *setting = &motor->motor_settings;
@@ -148,24 +149,28 @@ void DMMotorTask(void const *argument)
         {
             tffSet = motor->tff;
             pid_ref = motor->pid_ref;  
-            if(motor->motor_settings.outer_loop_type == ANGLE_LOOP)
-            {
+            if (setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)
+                pid_ref *= -1;
+            if(motor->motor_settings.outer_loop_type == ANGLE_LOOP) {
                 kp = motor->angle_PID.Kp;
                 kd = motor->angle_PID.Kd;
                 LIMIT_MIN_MAX(pid_ref, DM_P_MIN, DM_P_MAX);
                 motor_send_mailbox.position_des = float_to_uint(pid_ref, DM_P_MIN, DM_P_MAX, 16);
+                if (motor->angle_PID.Ki!=0) {
+                    ki_out = KICalculate(&motor->angle_PID, motor->measure.position, pid_ref);
+                }
             }
-            else if(motor->motor_settings.outer_loop_type == SPEED_LOOP)
-            {
+            else if(motor->motor_settings.outer_loop_type == SPEED_LOOP) {
                 kp = motor->speed_PID.Kp;
                 kd = motor->speed_PID.Kd;
                 LIMIT_MIN_MAX(pid_ref, DM_V_MIN, DM_V_MAX);
                 motor_send_mailbox.velocity_des = float_to_uint(pid_ref, DM_V_MIN, DM_V_MAX, 12);
+                if (motor->speed_PID.Ki!=0) {
+                    ki_out = KICalculate(&motor->speed_PID, motor->measure.velocity, pid_ref);
+                }
             }
-            if (setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)
-                pid_ref *= -1;
-                
-            motor_send_mailbox.torque_des = float_to_uint(tffSet, DM_T_MIN, DM_T_MAX, 12);
+
+            motor_send_mailbox.torque_des = float_to_uint(tffSet+ki_out, DM_T_MIN, DM_T_MAX, 12);
             motor_send_mailbox.Kp = kp;
             motor_send_mailbox.Kd = kd;
 

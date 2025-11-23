@@ -103,6 +103,14 @@ void ChassisInit()
     Motor_Init_Config_s chassis_motor_config = {
         .can_init_config.can_handle = &hcan2,
         .controller_param_init_config = {
+            .angle_PID = {
+                .Kp = 10, // 15
+                .Ki = 0,   // 0
+                .Kd = 0.03, // 0.03
+                .IntegralLimit = 3000,
+                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+                .MaxOut = 12000,
+            },//角度环 pid 还需要再调
             .speed_PID = {
                 .Kp = 1.5, // 4.5
                 .Ki = 0,  // 0
@@ -124,16 +132,16 @@ void ChassisInit()
             .angle_feedback_source = MOTOR_FEED,
             .speed_feedback_source = MOTOR_FEED,
             .outer_loop_type = SPEED_LOOP,
-            .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
+            .close_loop_type = ANGLE_LOOP | SPEED_LOOP | CURRENT_LOOP,
         },
         .motor_type = M3508,
     };
-    //  @todo: 当前还没有设置电机的正反转,仍然需要手动添加reference的正负号,需要电机module的支持,待修改.
-    chassis_motor_config.can_init_config.tx_id = 1;//4;
+    
+    chassis_motor_config.can_init_config.tx_id = 1;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
     motor_lf = DJIMotorInit(&chassis_motor_config);
 
-    chassis_motor_config.can_init_config.tx_id = 2;//;
+    chassis_motor_config.can_init_config.tx_id = 2;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;//
     motor_rf = DJIMotorInit(&chassis_motor_config);
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)

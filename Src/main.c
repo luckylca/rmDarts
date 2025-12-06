@@ -1,29 +1,30 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2023 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2023 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "cmsis_os.h"
 #include "adc.h"
 #include "can.h"
+#include "cmsis_os.h"
 #include "crc.h"
 #include "dac.h"
 #include "dma.h"
+#include "gpio.h"
 #include "i2c.h"
 #include "rng.h"
 #include "rtc.h"
@@ -31,96 +32,94 @@
 #include "tim.h"
 #include "usart.h"
 #include "usb_device.h"
-#include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "robot.h"
-#include "bsp_log.h"
 #include "at24c02.h"
+#include "bsp_log.h"
+#include "robot.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-int _write(int file, char *ptr, int len)
-{
-    // 将一个字符串通过 UART1 发送出去
-    HAL_UART_Transmit(&huart1, (uint8_t *)ptr, len, HAL_MAX_DELAY);
-    return len;
+int _write(int file, char *ptr, int len) {
+  // 将一个字符串通过 UART1 发送出去
+  HAL_UART_Transmit(&huart1, (uint8_t *)ptr, len, HAL_MAX_DELAY);
+  return len;
 }
-static void DebugFreeze_Init(void)
-{
-    /* F4 通常不需要给 DBGMCU 额外开时钟，没有该宏也没关系 */
-    #if defined(__HAL_RCC_DBGMCU_CLK_ENABLE)
-    __HAL_RCC_DBGMCU_CLK_ENABLE();
-    #endif
+static void DebugFreeze_Init(void) {
+/* F4 通常不需要给 DBGMCU 额外开时钟，没有该宏也没关系 */
+#if defined(__HAL_RCC_DBGMCU_CLK_ENABLE)
+  __HAL_RCC_DBGMCU_CLK_ENABLE();
+#endif
 
-    /* --- 定时器冻结（按需保留/都留也行，有宏才会编译） --- */
-    #ifdef __HAL_DBGMCU_FREEZE_TIM1
-    __HAL_DBGMCU_FREEZE_TIM1();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_TIM8
-    __HAL_DBGMCU_FREEZE_TIM8();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_TIM2
-    __HAL_DBGMCU_FREEZE_TIM2();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_TIM3
-    __HAL_DBGMCU_FREEZE_TIM3();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_TIM4
-    __HAL_DBGMCU_FREEZE_TIM4();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_TIM5
-    __HAL_DBGMCU_FREEZE_TIM5();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_TIM6
-    __HAL_DBGMCU_FREEZE_TIM6();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_TIM7
-    __HAL_DBGMCU_FREEZE_TIM7();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_TIM12
-    __HAL_DBGMCU_FREEZE_TIM12();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_TIM13
-    __HAL_DBGMCU_FREEZE_TIM13();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_TIM14
-    __HAL_DBGMCU_FREEZE_TIM14();
-    #endif
+/* --- 定时器冻结（按需保留/都留也行，有宏才会编译） --- */
+#ifdef __HAL_DBGMCU_FREEZE_TIM1
+  __HAL_DBGMCU_FREEZE_TIM1();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_TIM8
+  __HAL_DBGMCU_FREEZE_TIM8();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_TIM2
+  __HAL_DBGMCU_FREEZE_TIM2();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_TIM3
+  __HAL_DBGMCU_FREEZE_TIM3();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_TIM4
+  __HAL_DBGMCU_FREEZE_TIM4();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_TIM5
+  __HAL_DBGMCU_FREEZE_TIM5();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_TIM6
+  __HAL_DBGMCU_FREEZE_TIM6();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_TIM7
+  __HAL_DBGMCU_FREEZE_TIM7();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_TIM12
+  __HAL_DBGMCU_FREEZE_TIM12();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_TIM13
+  __HAL_DBGMCU_FREEZE_TIM13();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_TIM14
+  __HAL_DBGMCU_FREEZE_TIM14();
+#endif
 
-    /* --- 看门狗冻结 --- */
-    #ifdef __HAL_DBGMCU_FREEZE_IWDG
-    __HAL_DBGMCU_FREEZE_IWDG();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_WWDG
-    __HAL_DBGMCU_FREEZE_WWDG();
-    #endif
+/* --- 看门狗冻结 --- */
+#ifdef __HAL_DBGMCU_FREEZE_IWDG
+  __HAL_DBGMCU_FREEZE_IWDG();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_WWDG
+  __HAL_DBGMCU_FREEZE_WWDG();
+#endif
 
-    /* --- I2C 超时（有就冻，没有就跳过）--- */
-    #ifdef __HAL_DBGMCU_FREEZE_I2C1_TIMEOUT
-    __HAL_DBGMCU_FREEZE_I2C1_TIMEOUT();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_I2C2_TIMEOUT
-    __HAL_DBGMCU_FREEZE_I2C2_TIMEOUT();
-    #endif
-    #ifdef __HAL_DBGMCU_FREEZE_I2C3_TIMEOUT
-    __HAL_DBGMCU_FREEZE_I2C3_TIMEOUT();
-    #endif
+/* --- I2C 超时（有就冻，没有就跳过）--- */
+#ifdef __HAL_DBGMCU_FREEZE_I2C1_TIMEOUT
+  __HAL_DBGMCU_FREEZE_I2C1_TIMEOUT();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_I2C2_TIMEOUT
+  __HAL_DBGMCU_FREEZE_I2C2_TIMEOUT();
+#endif
+#ifdef __HAL_DBGMCU_FREEZE_I2C3_TIMEOUT
+  __HAL_DBGMCU_FREEZE_I2C3_TIMEOUT();
+#endif
 
-    /* --- CAN1/2 冻结（F4 有寄存器位；有 HAL 宏用宏，没宏用寄存器位） --- */
-    #ifdef __HAL_DBGMCU_FREEZE_CAN1
-    __HAL_DBGMCU_FREEZE_CAN1();
-    #elif defined(DBGMCU_APB1_FZ_DBG_CAN1_STOP)
-    DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_CAN1_STOP;
-    #endif
+/* --- CAN1/2 冻结（F4 有寄存器位；有 HAL 宏用宏，没宏用寄存器位） --- */
+#ifdef __HAL_DBGMCU_FREEZE_CAN1
+  __HAL_DBGMCU_FREEZE_CAN1();
+#elif defined(DBGMCU_APB1_FZ_DBG_CAN1_STOP)
+  DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_CAN1_STOP;
+#endif
 
-    #ifdef __HAL_DBGMCU_FREEZE_CAN2
-    __HAL_DBGMCU_FREEZE_CAN2();
-    #elif defined(DBGMCU_APB1_FZ_DBG_CAN2_STOP)
-    DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_CAN2_STOP;
-    #endif
+#ifdef __HAL_DBGMCU_FREEZE_CAN2
+  __HAL_DBGMCU_FREEZE_CAN2();
+#elif defined(DBGMCU_APB1_FZ_DBG_CAN2_STOP)
+  DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_CAN2_STOP;
+#endif
 }
 /* USER CODE END PTD */
 
@@ -152,18 +151,18 @@ void MX_FREERTOS_Init(void);
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
-int main(void)
-{
+ * @brief  The application entry point.
+ * @retval int
+ */
+int main(void) {
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick.
+   */
   HAL_Init();
 
   /* USER CODE BEGIN Init */
@@ -196,11 +195,12 @@ int main(void)
   MX_TIM8_Init();
   MX_I2C2_Init();
   MX_I2C3_Init();
+  // Soft_SPI_GPIO_Init();
   MX_SPI2_Init();
   MX_CRC_Init();
   MX_DAC_Init();
   /* USER CODE BEGIN 2 */
-	RobotInit(); // 唯一的初始化函数
+  RobotInit(); // 唯一的初始化函数
   LOGINFO("[main] SystemInit() and RobotInit() done");
   /* USER CODE END 2 */
 
@@ -213,8 +213,7 @@ int main(void)
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+  while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -223,22 +222,21 @@ int main(void)
 }
 
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
-void SystemClock_Config(void)
-{
+ * @brief System Clock Configuration
+ * @retval None
+ */
+void SystemClock_Config(void) {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-  */
+   */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
+   * in the RCC_OscInitTypeDef structure.
+   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -247,22 +245,20 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 7;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
     Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+   */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
+                                RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
-  {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) {
     Error_Handler();
   }
 }
@@ -272,15 +268,14 @@ void SystemClock_Config(void)
 /* USER CODE END 4 */
 
 /**
-  * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM14 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-  * a global variable "uwTick" used as application time base.
-  * @param  htim : TIM handle
-  * @retval None
-  */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
+ * @brief  Period elapsed callback in non blocking mode
+ * @note   This function is called  when TIM14 interrupt took place, inside
+ * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+ * a global variable "uwTick" used as application time base.
+ * @param  htim : TIM handle
+ * @retval None
+ */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   /* USER CODE BEGIN Callback 0 */
 
   /* USER CODE END Callback 0 */
@@ -293,33 +288,31 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
-void Error_Handler(void)
-{
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
+void Error_Handler(void) {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
-  while (1)
-  {
+  while (1) {
   }
   /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t *file, uint32_t line)
-{
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
+void assert_failed(uint8_t *file, uint32_t line) {
   /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* User can add his own implementation to report the file name and line
+     number, ex: printf("Wrong parameters value: file %s on line %d\r\n", file,
+     line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

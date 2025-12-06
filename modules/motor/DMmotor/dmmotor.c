@@ -161,7 +161,7 @@ void DMMotorTask(void const *argument)
                 }
             }
             else if(motor->motor_settings.outer_loop_type == SPEED_LOOP) {
-                kp = motor->speed_PID.Kp;
+                kp = 0;
                 kd = motor->speed_PID.Kd;
                 LIMIT_MIN_MAX(pid_ref, DM_V_MIN, DM_V_MAX);
                 motor_send_mailbox.velocity_des = float_to_uint(pid_ref, DM_V_MIN, DM_V_MAX, 12);

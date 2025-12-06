@@ -68,8 +68,8 @@ static float vt_lf, vt_rf, vt_lb, vt_rb; // 底盘速度解算后的临时输出
 extern double F_data[2];
 // 3508到位标志位
 int flag_3508_ready = 0;
+extern int flag_arm_sucess;
 // 完成机械臂动作
-extern int flag_arm_sucess ;
 
 // 等待装载延时标志位
 int flag_wait_dart_load_delay = 0; 
@@ -131,7 +131,7 @@ void ChassisInit()
         .controller_setting_init_config = {
             .angle_feedback_source = MOTOR_FEED,
             .speed_feedback_source = MOTOR_FEED,
-            .outer_loop_type = SPEED_LOOP,
+            .outer_loop_type = ANGLE_LOOP,
             .close_loop_type = ANGLE_LOOP | SPEED_LOOP | CURRENT_LOOP,
         },
         .motor_type = M3508,

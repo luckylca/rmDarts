@@ -339,7 +339,6 @@ void DJIMotorControl()
 
         // 获取最终输出
         set = (int16_t)pid_ref;
-
         // 分组填入发送数据
         group = motor->sender_group;
         num = motor->message_num;

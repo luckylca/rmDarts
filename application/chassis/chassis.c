@@ -23,10 +23,6 @@
 #include "referee_UI.h"
 #include "arm_math.h"
 #include <stdbool.h>
-/* 根据robot_def.h中的macro自动计算的参数 */
-#define HALF_WHEEL_BASE (WHEEL_BASE / 2.0f)     // 半轴距
-#define HALF_TRACK_WIDTH (TRACK_WIDTH / 2.0f)   // 半轮距
-#define PERIMETER_WHEEL (RADIUS_WHEEL * 2 * PI) // 轮子周长
 
 /* 底盘应用包含的模块和信息存储,底盘是单例模式,因此不需要为底盘建立单独的结构体 */
 #ifdef CHASSIS_BOARD // 如果是底盘板,使用板载IMU获取底盘转动角速度
@@ -98,13 +94,12 @@ extern int key;
 float v = -4000;  //转动速度
 
 void ChassisInit()
-{
-    // 四个轮子的参数一样,改tx_id和反转标志位即可
+{   
     Motor_Init_Config_s chassis_motor_config = {
-        .can_init_config.can_handle = &hcan2,
+        .can_init_config.can_handle = &hcan1,
         .controller_param_init_config = {
             .angle_PID = {
-                .Kp = 10, // 15
+                .Kp = 15, // 15
                 .Ki = 0,   // 0
                 .Kd = 0.03, // 0.03
                 .IntegralLimit = 3000,
@@ -195,12 +190,18 @@ void ChassisTask()
     switch (chassis_cmd_recv.chassis_mode)
     {
         case CHASSIS_ZERO_FORCE:
+            DJIMotorOuterLoop(motor_lf, SPEED_LOOP);
+            DJIMotorOuterLoop(motor_rf, SPEED_LOOP);
             DJIMotorSetRef(motor_lf, 0);
             DJIMotorSetRef(motor_rf, 0);
             break;
         case CHASSIS_TEST: 
+            DJIMotorOuterLoop(motor_lf, ANGLE_LOOP);
+            DJIMotorOuterLoop(motor_rf, ANGLE_LOOP);
             DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);//2000 左右能动
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
+            // DJIMotorSetRef(motor_lf, 2000);
+            // DJIMotorSetRef(motor_rf, 2000);
             break;
         case AUTO_MODE: 
             // if(flag_2006_back){

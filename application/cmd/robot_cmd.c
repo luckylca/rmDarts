@@ -22,9 +22,6 @@
 #include <stdbool.h>
 
 
-// 私有宏,自动将编码器转换成角度值
-#define YAW_ALIGN_ANGLE (YAW_CHASSIS_ALIGN_ECD * ECD_ANGLE_COEF_DJI) // 对齐时的角度,0-360
-#define PTICH_HORIZON_ANGLE (PITCH_HORIZON_ECD * ECD_ANGLE_COEF_DJI) // pitch水平时电机的角度,0-360
 
 /* cmd应用包含的模块实例指针和交互信息存储*/
 #ifdef GIMBAL_BOARD // 对双板的兼容,条件编译
@@ -203,8 +200,8 @@ static void RemoteControlSet()
         {
             shoot_cmd_send.banji_mode = BANJI_OFF;
         }
-        shoot_cmd_send.shoot_rate += 60.0f * (float)rc_data[TEMP].rc.rocker_l1;    //参数要改
-        chassis_cmd_send.v1 += 30.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
+        shoot_cmd_send.shoot_rate -= 0.01f * (float)rc_data[TEMP].rc.rocker_l1;    //参数要改
+        chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
         gimbal_cmd_send.yaw += 0.001f * (float)rc_data[TEMP].rc.rocker_l_;//底盘的位置
         shoot_cmd_send.rotate_rate += 30.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
     }
@@ -321,24 +318,24 @@ static void RemoteControl_outline_ALARM()
 static void EmergencyHandler()
 {   
     // 拨轮的向下拨超过一半进入急停模式.注意向打时下拨轮是正
-    if ((RemoteControlIsOnline()==0)|| robot_state == ROBOT_STOP) // 还需添加重要应用和模块离线的判断
-    { 
+    // if ((RemoteControlIsOnline()==0)|| robot_state == ROBOT_STOP) // 还需添加重要应用和模块离线的判断
+    // { 
         
-        alarm_count++;
-        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
-        chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
-        shoot_cmd_send.shoot_mode = SHOOT_OFF;
-        shoot_cmd_send.banji_mode = BANJI_OFF;
-        shoot_cmd_send.load_mode = LOAD_STOP;
-        LOGERROR("[CMD] emergency stop!");
-    } 
-    else 
-    {   
-        alarm_count = 0;
-        robot_state = ROBOT_READY;
-        shoot_cmd_send.shoot_mode = SHOOT_ON;
-        LOGINFO("[CMD] reinstate, robot ready");
-    }
+    //     alarm_count++;
+    //     gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
+    //     chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
+    //     shoot_cmd_send.shoot_mode = SHOOT_OFF;
+    //     shoot_cmd_send.banji_mode = BANJI_OFF;
+    //     shoot_cmd_send.load_mode = LOAD_STOP;
+    //     LOGERROR("[CMD] emergency stop!");
+    // } 
+    // else 
+    // {   
+    //     alarm_count = 0;
+    //     robot_state = ROBOT_READY;
+    //     shoot_cmd_send.shoot_mode = SHOOT_ON;
+    //     LOGINFO("[CMD] reinstate, robot ready");
+    // }
 }
 
 void RobotCMDTask()

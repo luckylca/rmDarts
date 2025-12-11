@@ -24,7 +24,7 @@ void GimbalInit() {
   Motor_Init_Config_s yaw_config = {
       .can_init_config =
           {
-              .can_handle = &hcan2,
+              .can_handle = &hcan1,
               .tx_id = 4,
           },
       .controller_param_init_config =
@@ -67,7 +67,7 @@ void GimbalInit() {
                                           //  MOTOR_DIRECTION_REVERSE
           },
       .motor_type = M2006,
-      .storage_type = USE_STORAGE};
+      .storage_type = NO_STORAGE};
   // 电机对total_angle闭环,上电时为零,会保持静止,收到遥控器数据再动
   yaw_motor = DJIMotorInit(&yaw_config);
 
@@ -79,7 +79,7 @@ void GimbalInit() {
       .callback = NULL,
       .id = NULL,
   };
-  encoder = EncoderInit(&encoder_spi_config);
+  // encoder = EncoderInit(&encoder_spi_config);
 
   gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
   gimbal_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));

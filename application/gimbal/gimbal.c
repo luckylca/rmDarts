@@ -25,13 +25,13 @@ void GimbalInit() {
       .can_init_config =
           {
               .can_handle = &hcan1,
-              .tx_id = 4,
+              .tx_id = 7,
           },
       .controller_param_init_config =
           {
               .angle_PID =
                   {
-                      .Kp = 12, // 10
+                      .Kp = 10, // 10
                       .Ki = 0,
                       .Kd = 1,
                       .MaxOut = 200,
@@ -60,7 +60,7 @@ void GimbalInit() {
               .angle_feedback_source = MOTOR_FEED,
               .speed_feedback_source = MOTOR_FEED,
               .outer_loop_type =
-                  ANGLE_LOOP, // 初始化成SPEED_LOOP,让拨盘停在原地,防止拨盘上电时乱转
+                  SPEED_LOOP, // 初始化成SPEED_LOOP,让拨盘停在原地,防止拨盘上电时乱转
               .close_loop_type = CURRENT_LOOP | SPEED_LOOP | ANGLE_LOOP,
               .motor_reverse_flag =
                   MOTOR_DIRECTION_NORMAL, //  MOTOR_DIRECTION_NORMAL

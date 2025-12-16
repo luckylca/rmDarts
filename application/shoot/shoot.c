@@ -10,6 +10,8 @@
 #include "servo_motor.h"
 #include <stdbool.h>
 
+#include "cmsis_os.h"
+
 #define DEAD_LINE_LOAD 20
 static DJIMotorInstance *chargeLoader;	  // 蓄力丝杆
 static DMMotorInstance *rotateChageDarts; // 拨盘电机dm
@@ -192,7 +194,7 @@ void ShootInit()
 			{
 				.angle_PID =
 					{
-						.Kp = 12, // 10
+						.Kp = 20, // 10
 						.Ki = 0,
 						.Kd = 1,
 						.MaxOut = 200,
@@ -220,10 +222,10 @@ void ShootInit()
 			{
 				.angle_feedback_source = MOTOR_FEED,
 				.speed_feedback_source = MOTOR_FEED,
-				.outer_loop_type = ANGLE_LOOP,
+				.outer_loop_type = SPEED_LOOP,
 				.close_loop_type = CURRENT_LOOP | SPEED_LOOP | ANGLE_LOOP,
 				.motor_reverse_flag =
-					MOTOR_DIRECTION_NORMAL, // 注意方向设置为拨盘的拨出的击发方向
+					MOTOR_DIRECTION_REVERSE, // 注意方向设置为拨盘的拨出的击发方向
 											// MOTOR_DIRECTION_NORMAL
 											// MOTOR_DIRECTION_REVERSE
 			},
@@ -283,6 +285,44 @@ void init_angle()
 	f = 1;
 }
 
+
+/**
+ * @brief 阶梯式测试扳机舵机 (非阻塞，需在循环中调用)
+ * 从 0 到 0.5，每次增加 0.005f，每步停留 1 秒
+ */
+// 将变量提升到函数外部（全局变量），方便在 Ozone Watch 窗口中查看
+float banji_test_current_angle = 0.0f; 
+
+void BanjiServoStepTest()
+{
+    static uint32_t last_move_time = 0;
+    const float START_ANGLE = 0.0f;
+    const float END_ANGLE = 0.5f;
+    const float STEP_SIZE = 0.005f;
+    const uint32_t INTERVAL_MS = 1000; // 1秒
+
+    // 获取当前时间 (ms)
+    uint32_t now = HAL_GetTick();
+
+    // 检查是否达到时间间隔
+    if (now - last_move_time >= INTERVAL_MS)
+    {
+        last_move_time = now;
+
+        // 设置舵机角度
+        ServoSetAngle(banji_motor, banji_test_current_angle);
+
+        // 增加角度
+        banji_test_current_angle += STEP_SIZE;
+
+        // 如果超过最大值，重置为最小值 (或者你可以选择停止)
+        if (banji_test_current_angle > END_ANGLE)
+        {
+            banji_test_current_angle = START_ANGLE;
+        }
+    }
+}
+
 /* 机器人发射机构控制核心任务 */
 void ShootTask()
 {
@@ -290,11 +330,11 @@ void ShootTask()
 	SubGetMessage(shoot_sub, &shoot_cmd_recv);
 	// DMMotorSetRef(rotateChageDarts, 3.14,0);
 	// 初始化丝杆角度
-	if (read_2006_angle == 1)
-	{
-		loader_origin_angle = chargeLoader->measure.total_angle;
-		read_2006_angle = 0;
-	}
+	// if (read_2006_angle == 1)
+	// {
+	// 	loader_origin_angle = chargeLoader->measure.total_angle;
+	// 	read_2006_angle = 0;
+	// }
 	// 对shoot mode等于SHOOT_STOP的情况特殊处理,直接停止所有电机(紧急停止)
 	// if (shoot_cmd_recv.shoot_mode == SHOOT_OFF)
 	// {
@@ -446,27 +486,34 @@ void ShootTask()
 	//         break;
 	//     case LOADER_TEST:
 	//         DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
-	//         DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_rate);
+	//         DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
 	//         break;
 	//     default:
 	//         break;
 	// }
 
+	// ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+	// osDelay(1000);
+	// ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
+	// osDelay(1000);
+	
+	// BanjiServoStepTest();
+
 	switch (shoot_cmd_recv.shoot_mode)
 	{
 	case SHOOT_OFF:
 		ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-		DJIMotorStop(chargeLoader);
+		DJIMotorStop(chargeLoader); 
 		DMMotorStop(rotateChageDarts);
 		break;
 	case SHOOT_TEST:
 		switch (shoot_cmd_recv.banji_mode)
 		{
 		case BANJI_OFF:
-			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
+			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
 			break;
 		case BANJI_ON:
-			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
 			break;
 		case BANJI_AUTO:
 			break;
@@ -481,7 +528,7 @@ void ShootTask()
 			break;
 		case LOADER_TEST:
 			DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
-			DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_rate);
+			DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
 			// DJIMotorSetRef(chargeLoader, -5000);
 			break;
 		case AUTO_LOAD:

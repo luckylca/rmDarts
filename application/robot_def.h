@@ -26,8 +26,8 @@
 
 /* 机器人重要参数定义,注意根据不同机器人进行修改,浮点数需要以.0或f结尾,无符号以u结尾 */
 
-#define BANJI_OPEN_ANGLE 0.0f    // 扳机舵机打开角度
-#define BANJI_CLOSE_ANGLE 0.078f // 扳机舵机关闭角度
+#define BANJI_OPEN_ANGLE 0.026f    // 扳机舵机打开角度
+#define BANJI_CLOSE_ANGLE 0.040f // 扳机舵机关闭角度
 #define GRIPPER_LAY_ANGLE 0.0f   // 夹爪放置角度
 #define GRIPPER_NORMAL_ANGLE 0.05f // 夹爪正常角度
 
@@ -69,7 +69,7 @@ typedef enum
     CHASSIS_ZERO_FORCE = 0,    // 电流零输入
     CHASSIS_TEST,
     AUTO_MODE,
-} chassis_mode_e;
+} chassis_mode_e;    
 
 // 云台模式设置
 typedef enum
@@ -172,7 +172,7 @@ typedef struct
     loader_mode_e load_mode;//丝杆模式
     banji_mode_e banji_mode;//扳机模式
     rotate_mode_e rotate_mode;//旋转换弹模式
-    float shoot_rate;
+    float shoot_data;
     float rotate_rate;
     float banjiPos;
 } Shoot_Ctrl_Cmd_s;

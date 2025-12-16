@@ -200,9 +200,9 @@ static void RemoteControlSet()
         {
             shoot_cmd_send.banji_mode = BANJI_OFF;
         }
-        shoot_cmd_send.shoot_rate -= 0.01f * (float)rc_data[TEMP].rc.rocker_l1;    //参数要改
+        shoot_cmd_send.shoot_data = 20.0f * (float)rc_data[TEMP].rc.rocker_l1;    //参数要改
         chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
-        gimbal_cmd_send.yaw += 0.001f * (float)rc_data[TEMP].rc.rocker_l_;//底盘的位置
+        gimbal_cmd_send.yaw = 15.0f * (float)rc_data[TEMP].rc.rocker_l_;//底盘的位置
         shoot_cmd_send.rotate_rate += 30.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
     }
     else if (switch_is_down(rc_data[TEMP].rc.switch_right)) // 
@@ -257,16 +257,16 @@ static void RemoteControlSet()
 
         if(rc_data[TEMP].rc.rocker_r_>200)
         { 
-            shoot_cmd_send.shoot_rate =20000;
+            shoot_cmd_send.shoot_data =20000;
         }
         else if(rc_data[TEMP].rc.rocker_r_<-200)
         {
-            shoot_cmd_send.shoot_rate =-20000;
+            shoot_cmd_send.shoot_data =-20000;
         }
         else
-            shoot_cmd_send.shoot_rate = 0;
+            shoot_cmd_send.shoot_data = 0;
 
-        // shoot_cmd_send.shoot_rate += 0.1f * (float)rc_data[TEMP].rc.rocker_r_;    //参数  要改
+        // shoot_cmd_send.shoot_data += 0.1f * (float)rc_data[TEMP].rc.rocker_r_;    //参数  要改
         // chassis_cmd_send.v1 = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
     }
 

@@ -126,7 +126,7 @@ void ChassisInit()
         .controller_setting_init_config = {
             .angle_feedback_source = MOTOR_FEED,
             .speed_feedback_source = MOTOR_FEED,
-            .outer_loop_type = ANGLE_LOOP,
+            .outer_loop_type = SPEED_LOOP,
             .close_loop_type = ANGLE_LOOP | SPEED_LOOP | CURRENT_LOOP,
         },
         .motor_type = M3508,
@@ -200,8 +200,6 @@ void ChassisTask()
             DJIMotorOuterLoop(motor_rf, ANGLE_LOOP);
             DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);//2000 左右能动
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
-            // DJIMotorSetRef(motor_lf, 2000);
-            // DJIMotorSetRef(motor_rf, 2000);
             break;
         case AUTO_MODE: 
             // if(flag_2006_back){

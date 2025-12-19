@@ -20,7 +20,7 @@
 // 用于遥控器数据读取,遥控器数据是一个大小为2的数组
 #define LAST 1
 #define TEMP 0
-#define USE_CYY_SBUS_REMOTE 0 // 是否使用sbus版本的遥控器,1:使用SBUS 0:使用DBUS
+#define USE_CYY_SBUS_REMOTE 1 // 是否使用sbus版本的遥控器,1:使用SBUS 0:使用DBUS
 
 // 获取按键操作
 #define KEY_PRESS 0

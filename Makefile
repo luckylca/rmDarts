@@ -149,6 +149,8 @@ modules/referee/rm_referee.c \
 modules/referee/referee_UI.c \
 modules/referee/referee_task.c \
 modules/remote/remote_control.c \
+modules/remote/flysky/flysky.c \
+modules/remote/mc6c/mc6c.c \
 modules/super_cap/super_cap.c \
 modules/can_comm/can_comm.c \
 modules/message_center/message_center.c \
@@ -272,6 +274,8 @@ C_INCLUDES =  \
 -Imodules/oled \
 -Imodules/referee \
 -Imodules/remote \
+-Imodules/remote/flysky \
+-Imodules/remote/mc6c \
 -Imodules/super_cap \
 -Imodules/can_comm \
 -Imodules/message_center \

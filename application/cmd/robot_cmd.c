@@ -2,8 +2,10 @@
 #include "robot_def.h"
 #include "robot_cmd.h"
 #include "vision.h"
+#include "status.h"
 // module
 #include "remote_control.h"
+#include "mc6c.h"
 #include "ins_task.h"
 #include "master_process.h"
 #include "message_center.h"
@@ -36,7 +38,7 @@ UART_HandleTypeDef huart2;
 static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信息,包括控制信息和UI绘制相关
 static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息,底盘功率枪口热量与底盘运动状态等
 
-static RC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
+static MC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
 static volatile double *F_data = NULL;
 static Vision_Recv_s *vision_recv_data; // 视觉接收数据指针,初始化时返回
 static Vision_Send_s vision_send_data;  // 视觉发送数据
@@ -129,7 +131,8 @@ void RobotCMDInit()
     remot_alarm = BuzzerRegister(&buzzer_config);
 
 
-    rc_data = RemoteControlInit(&huart3);   // 修改为对应串口,注意如果是自研板dbus协议串口需选用添加了反相器的那个
+    // rc_data = RemoteControlInit(&huart3);   // 修改为对应串口,注意如果是自研板dbus协议串口需选用添加了反相器的那个
+    rc_data = MCControlInit(&huart3);
 
     F_data = F_Init(&huart6);
 
@@ -137,7 +140,6 @@ void RobotCMDInit()
     
     readAllMotorAngle(); // 从EEPROM加载所有电机总角度数据
     // imageRoad_data = ImageRoadTaskInit(&huart1);
-
     Vision_angle.pitch = 0;
     Vision_angle.yaw = 0;
     Vision_angle.flag = 0;
@@ -184,6 +186,101 @@ static void CalcOffsetAngle()
  */
 static void RemoteControlSet()
 {
+    #ifdef MC_SBUS
+    // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
+    if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_MID) 
+    {
+        chassis_cmd_send.chassis_mode = CHASSIS_TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
+        shoot_cmd_send.shoot_mode = SHOOT_TEST;
+        shoot_cmd_send.rotate_mode = ROTATE_TEST;
+        shoot_cmd_send.load_mode = LOADER_TEST;
+        gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
+        // shoot_cmd_send.shoot_data = 20.0f * (float)rc_data[TEMP].rocker_l1;    //参数要改
+        shoot_cmd_send.shoot_data += 0.5f * (float)rc_data[TEMP].rocker_l1; 
+        chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
+        gimbal_cmd_send.yaw = 15.0f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
+        shoot_cmd_send.rotate_rate += 30.0f * (float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
+    }
+    else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_DOWN) // 
+    {
+        chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
+        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
+        shoot_cmd_send.shoot_mode = SHOOT_OFF;
+        shoot_cmd_send.load_mode = LOAD_STOP;
+        shoot_cmd_send.rotate_mode = ROTATE_STOP;
+    }
+    else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_UP)
+    {
+        chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
+        shoot_cmd_send.shoot_mode = SHOOT_AUTO;
+        shoot_cmd_send.load_mode = AUTO_LOAD;
+        shoot_cmd_send.banji_mode = BANJI_AUTO;
+        shoot_cmd_send.rotate_mode = ROTATE_AUTO;
+        //初始化2006
+        if(flag_init_goal==false)
+        {
+            goal = ANGLE_LOAD;
+            flag_init_goal = true;
+        }
+
+        //裁判系统接受的数据
+        int res=referee_info->DartInfo.dart_info/64%4;
+        //手动测试
+        // if(key==3||key==2){
+        //     goal=ANGLE_16M;
+        // }
+        // else if(key==1||key==4){
+        //     goal=ANGLE_25M;
+        // }        
+        //2006归位且换弹未完成可更换发射目标
+        if(flag_2006_back&&!flag_arm_sucess){
+            //裁判系统更改
+            if(res==1||res==0){
+                goal=ANGLE_16M;     //前哨站
+            }
+            else if(res==2||res==3){
+                goal=ANGLE_16M;     //基地固定or随机
+            }
+        }
+        //发射站状态
+        if(referee_info->DartCmd.dart_launch_opening_status==0){
+            allow=1;
+        }
+        else{
+            allow=0;
+        }
+
+        if(rc_data[TEMP].rocker_r_>200)
+        { 
+            shoot_cmd_send.shoot_data =20000;
+        }
+        else if(rc_data[TEMP].rocker_r_<-200)
+        {
+            shoot_cmd_send.shoot_data =-20000;
+        }
+        else
+            shoot_cmd_send.shoot_data = 0;
+
+        // shoot_cmd_send.shoot_data += 0.1f * (float)rc_data[TEMP].rc.rocker_r_;    //参数  要改
+        // chassis_cmd_send.v1 = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
+    }
+
+    //下面是对每个模式的细化设置，就是在 TEST 模式下的对某个模块做其他测试
+    if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_MID) // 
+    {   
+        shoot_cmd_send.banji_mode = BANJI_OFF;
+    }
+    else if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_DOWN)// || vision_recv_data->target_state == NO_TARGET
+    {
+        shoot_cmd_send.banji_mode = BANJI_ON;
+    }
+    else if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_UP) // 左 侧开关状态[上],
+    {
+        //自动模式
+    }                        
+    #endif
+
+    #ifdef DBUS
     // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
     if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 
     {
@@ -273,17 +370,17 @@ static void RemoteControlSet()
     //下面是对每个模式的细化设置，就是在 TEST 模式下的对某个模块做其他测试
     if (switch_is_mid(rc_data[TEMP].rc.switch_left)) // 
     {   
-
+        shoot_cmd_send.banji_mode = BANJI_OFF;
     }
     else if (switch_is_down(rc_data[TEMP].rc.switch_left))// || vision_recv_data->target_state == NO_TARGET
     {
-
+        shoot_cmd_send.banji_mode = BANJI_ON;
     }
     else if (switch_is_up(rc_data[TEMP].rc.switch_left)) // 左 侧开关状态[上],
     {
         //自动模式
     }                                       
-
+    #endif
 
 }
 static void VisionControl()
@@ -336,6 +433,7 @@ static void EmergencyHandler()
     //     shoot_cmd_send.shoot_mode = SHOOT_ON;
     //     LOGINFO("[CMD] reinstate, robot ready");
     // }
+    
 }
 
 void RobotCMDTask()

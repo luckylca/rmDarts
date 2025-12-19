@@ -197,7 +197,7 @@ void ShootInit()
 						.Kp = 20, // 10
 						.Ki = 0,
 						.Kd = 1,
-						.MaxOut = 200,
+						.MaxOut = 500000,
 					},
 				.speed_PID =
 					{
@@ -527,7 +527,7 @@ void ShootTask()
 			DJIMotorSetRef(chargeLoader, 0);			 // 同时设定
 			break;
 		case LOADER_TEST:
-			DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
+			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
 			DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
 			// DJIMotorSetRef(chargeLoader, -5000);
 			break;

@@ -1,6 +1,7 @@
 #ifndef ENCODER_H
 #define ENCODER_H
 #include "bsp_spi.h"
+#include "bsp_dwt.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -28,14 +29,24 @@
 #define ZERO_H_REG              0x01
 #define DIR_REG                 0X09
 
+#define ZF_ABS_ENCODER_ECD_MAX       4095
+#define ZF_ENCODER_ECD_TO_DEGREE       (360.0/ZF_ABS_ENCODER_ECD_MAX)
+
 void Soft_SPI_GPIO_Init(void);
 void   encoder_init_spi(void);
 uint16_t encoder_angle_spi(void);
+typedef struct
+{
+    float angle;     // 绝对式位置，0-360°
+    uint16_t position;     // 绝对式位置，0-4095
+
+} ZF_ABS_ENCODER_Data_t;
 
 typedef struct EncoderInstance {
-    int position;
+    ZF_ABS_ENCODER_Data_t measure;
     SPIInstance *encoder_spi_instance;
 } EncoderInstance;
+
 
 EncoderInstance *EncoderInit(SPI_Init_Config_s *spi_config);
 void EncoderTask();

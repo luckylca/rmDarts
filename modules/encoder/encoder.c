@@ -10,51 +10,6 @@
  */
 #include "encoder.h"
 
-/* 软件 SPI 引脚定义宏，方便修改 */
-
-void Soft_SPI_GPIO_Init(void)
-{
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(GPIOB, SCK_Pin | MOSI_Pin, GPIO_PIN_RESET);
-
-    /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET);
-
-    /*Configure GPIO pin : SCK_Pin */
-    GPIO_InitStruct.Pin = SCK_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(SCK_GPIO_Port, &GPIO_InitStruct);
-
-    /*Configure GPIO pin : MISO_Pin */
-    GPIO_InitStruct.Pin = MISO_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(MISO_GPIO_Port, &GPIO_InitStruct);
-
-    /*Configure GPIO pin : MOSI_Pin */
-    GPIO_InitStruct.Pin = MOSI_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    HAL_GPIO_Init(MOSI_GPIO_Port, &GPIO_InitStruct);
-
-    /*Configure GPIO pin : CS_Pin */
-    GPIO_InitStruct.Pin = CS_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    HAL_GPIO_Init(CS_GPIO_Port, &GPIO_InitStruct);
-}
-void delay_us(uint32_t us)
-{
-    uint32_t startTick = DWT->CYCCNT;
-    uint32_t delayTicks = us * (SystemCoreClock / 1000000);
-    while ((DWT->CYCCNT - startTick) < delayTicks)
-        ;
-}
 //-------------------------------------------------------------------------------------------------------------------
 //  @brief      通过SPI写一个byte,同时读取一个byte
 //  @param      byte        发送的数据
@@ -67,20 +22,7 @@ static uint8_t spi_wr_byte(uint8_t byte)
     HAL_SPI_TransmitReceive(&hspi2, &byte, &byte, 1, 0xFFFF);
     return (byte);
 }
-// uint8_t spi_wr_byte(uint8_t byte)
-// {
-//     uint8_t i;
-//     for(i=0; i<8; i++)
-//     {
-//         ABS_ENCODER_MOSI((uint8_t)(byte&0x80));
-//         byte <<= 1;
-//         ABS_ENCODER_SCK (0);
 
-//         ABS_ENCODER_SCK (1);
-//         byte |= ABS_ENCODER_MISO;
-//     }
-//     return(byte);
-// }
 //-------------------------------------------------------------------------------------------------------------------
 //  @brief      将val写入cmd对应的寄存器地址,同时返回status字节
 //  @param      cmd         命令字
@@ -129,7 +71,7 @@ static uint8_t encoder_spi_w_reg_byte(uint8_t cmd, uint8_t val)
     spi_wr_byte(cmd);
     spi_wr_byte(val);
     ABS_ENCODER_CSN(1);
-    delay_us(1000);
+    DWT_Delay(0.01);
     ABS_ENCODER_CSN(0);
     dat = spi_wr_byte(0x00);
     spi_wr_byte(0x00);
@@ -156,8 +98,7 @@ static void encoder_spi_r_reg_byte(uint8_t cmd, uint8_t *val)
     spi_wr_byte(0x00);
 
     ABS_ENCODER_CSN(1);
-    // HAL_Delay(1);
-    delay_us(1000);
+    DWT_Delay(0.001);
     ABS_ENCODER_CSN(0);
     *val = spi_wr_byte(0x00);
     spi_wr_byte(0x00);
@@ -241,7 +182,8 @@ EncoderInstance *EncoderInit(SPI_Init_Config_s *spi_config)
     EncoderInstance *encoder = malloc(sizeof(EncoderInstance));
     memset(encoder, 0, sizeof(EncoderInstance));
 
-    encoder->position = 0;
+    encoder->measure.angle = 0;
+    encoder->measure.position = 0;
     // encoder->encoder_spi_instance = spi_instance;
 
     encoder_init_spi();
@@ -254,6 +196,7 @@ EncoderInstance *EncoderInit(SPI_Init_Config_s *spi_config)
 
 void EncoderTask()
 {
-    encoder_instance->position = encoder_angle_spi();
+    encoder_instance->measure.position = encoder_angle_spi();
+    encoder_instance->measure.angle = encoder_instance->measure.position *ZF_ENCODER_ECD_TO_DEGREE;
     // 读取编码器数据的任务实现
 }

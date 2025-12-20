@@ -7,6 +7,7 @@
 #include "message_center.h"
 #include "robot_def.h"
 #include "user_lib.h"
+#include "controller.h"
 static DJIMotorInstance *yaw_motor;
 static Publisher_t *gimbal_pub;  // 云台应用消息发布者(云台反馈给cmd)
 static Subscriber_t *gimbal_sub; // cmd控制消息订阅者
@@ -31,10 +32,10 @@ void GimbalInit() {
           {
               .angle_PID =
                   {
-                      .Kp = 10, // 10
+                      .Kp = 20, // 10
                       .Ki = 0,
                       .Kd = 1,
-                      .MaxOut = 200,
+                      .MaxOut = 50000,
                   },
               .speed_PID =
                   {
@@ -95,6 +96,7 @@ void GimbalTask() {
     break;
   case GIMBAL_TEST:
     DJIMotorEnable(yaw_motor);
+    DJIMotorOuterLoop(yaw_motor, ANGLE_LOOP);
     DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw); // 这里大概率还需要调节系数
     break;
   case AUTO_DART:

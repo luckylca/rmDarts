@@ -200,7 +200,7 @@ __attribute__((noreturn)) void StartUART6TASK(void const *argument)
     LOGINFO("[freeRTOS] UART6 Task Start");
     for (;;)
     {
-  
+
         uart6Task();
            // 遥控器数据,初始化时返回
         osDelay(1);

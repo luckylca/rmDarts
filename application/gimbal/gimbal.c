@@ -35,7 +35,7 @@ void GimbalInit() {
                       .Kp = 20, // 10
                       .Ki = 0,
                       .Kd = 1,
-                      .MaxOut = 50000,
+                      .MaxOut = 500000,
                   },
               .speed_PID =
                   {

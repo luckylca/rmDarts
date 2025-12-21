@@ -99,12 +99,12 @@ void ChassisInit()
         .can_init_config.can_handle = &hcan1,
         .controller_param_init_config = {
             .angle_PID = {
-                .Kp = 15, // 15
+                .Kp = 20, // 15
                 .Ki = 0,   // 0
                 .Kd = 0.03, // 0.03
                 .IntegralLimit = 3000,
                 .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-                .MaxOut = 12000,
+                .MaxOut = 20000,
             },//角度环 pid 还需要再调
             .speed_PID = {
                 .Kp = 1.5, // 4.5
@@ -112,7 +112,7 @@ void ChassisInit()
                 .Kd = 0.0001,  // 0
                 .IntegralLimit = 3000,
                 .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-                .MaxOut = 12000,
+                .MaxOut = 20000,
             },
             .current_PID = {
                 .Kp = 1, // 0.4

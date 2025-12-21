@@ -195,8 +195,24 @@ static void RemoteControlSet()
         shoot_cmd_send.rotate_mode = ROTATE_TEST;
         shoot_cmd_send.load_mode = LOADER_TEST;
         gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
+        if(fabs(rc_data[TEMP].rocker_l1)<50)// 拨轮打开发射
+        {
+            rc_data[TEMP].rocker_l1=0;
+        }
+        if(fabs(rc_data[TEMP].rocker_r1)<50)
+        {
+            rc_data[TEMP].rocker_r1=0;
+        }
+        if(fabs(rc_data[TEMP].rocker_r_)<50)
+        {
+            rc_data[TEMP].rocker_r_=0;
+        }
+        if(fabs(rc_data[TEMP].rocker_l_)<50)
+        {
+            rc_data[TEMP].rocker_l_=0;
+        }
         // shoot_cmd_send.shoot_data = 20.0f * (float)rc_data[TEMP].rocker_l1;    //参数要改
-        shoot_cmd_send.shoot_data += 1.0f * (float)rc_data[TEMP].rocker_l1; 
+        shoot_cmd_send.shoot_data += 0.8f * (float)rc_data[TEMP].rocker_l1; 
         chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
         gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
         shoot_cmd_send.rotate_rate += 30.0f * (float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改

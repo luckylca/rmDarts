@@ -194,7 +194,7 @@ void ShootInit()
 			{
 				.angle_PID =
 					{
-						.Kp = 20, // 10
+						.Kp = 15, // 10
 						.Ki = 0,
 						.Kd = 1,
 						.MaxOut = 500000,
@@ -206,7 +206,7 @@ void ShootInit()
 						.Kd = 0,
 						.Improve = PID_Integral_Limit,
 						.IntegralLimit = 5000,
-						.MaxOut = 5000,
+						.MaxOut = 6000,
 					},
 				.current_PID =
 					{

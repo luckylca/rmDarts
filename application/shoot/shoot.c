@@ -9,6 +9,7 @@
 #include "robot_def.h"
 #include "servo_motor.h"
 #include <stdbool.h>
+#include "status.h"
 
 #include "cmsis_os.h"
 
@@ -557,6 +558,110 @@ void ShootTask()
 	case SHOOT_AUTO:
 		// 这是整个流程的 auto
 		/* code */
+		
+		// 第一发镖
+		{
+			uint8_t cur = DartSys.currentStep; 
+			// 防止数组越界
+			if (cur >= 4) return;
+
+			if (cur == 0) {
+				if (!DART_CHECK_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS)) {
+					// 扳机移动到发射位置
+				}
+				if (!DART_CHECK_BIT(0, FLAG_FIRED)) {
+					// 扳机打开，发射飞镖
+				}
+				if (!DART_CHECK_BIT(0, FLAG_STEP_DONE)) {
+					// 第一发镖完成标志位,这个时候开始运行旋转换弹的旋转 30°
+				}
+				return;
+			}
+
+			// 第二发镖
+			if (cur == 1) {
+				if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_LOAD_POS)) {
+					// 扳机移动到装弹位置
+				}
+				if (!DART_CHECK_BIT(1, FLAG_RELOAD_ROTATED)) {
+					// 旋转换弹电机到达旋转位置
+				}
+				if (!DART_CHECK_BIT(1, FLAG_ARM_ANGLE_READY)) {
+					// 机械臂角度到达位置
+				}
+				if (!DART_CHECK_BIT(1, FLAG_DART_DROPPED)) {
+					// 关闭电磁铁，放下飞镖
+				}
+				// if (!shoot_Step_2_RotateChangeDartBegin) {
+				// 	// 这个时候开始运行旋转换弹的旋转 120°
+				// }
+				if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS)) {
+					// 扳机移动到发射位置
+				}
+				if (!DART_CHECK_BIT(1, FLAG_FIRED)) {
+					// 扳机打开，发射飞镖
+				}
+				if (!DART_CHECK_BIT(1, FLAG_STEP_DONE)) {
+					// 第二发镖完成标志位
+				}
+				return;
+			}
+
+			// 第三发镖
+			if (cur == 2) {
+				if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_LOAD_POS)) {
+					// 扳机移动到装弹位置
+				}
+				if (!DART_CHECK_BIT(2, FLAG_RELOAD_ROTATED)) {
+					// 旋转换弹电机到达旋转位置
+				}
+				if (!DART_CHECK_BIT(2, FLAG_ARM_ANGLE_READY)) {
+					// 机械臂角度到达位置
+				}
+				if (!DART_CHECK_BIT(2, FLAG_DART_DROPPED)) {
+					// 关闭电磁铁，放下飞镖
+				}
+				// if (!shoot_Step_3_RotateChangeDartBegin) {
+				// 	// 这个时候开始运行旋转换弹的旋转 120°
+				// }
+				if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS)) {
+					// 扳机移动到发射位置
+				}
+				if (!DART_CHECK_BIT(2, FLAG_FIRED)) {
+					// 扳机打开，发射飞镖
+				}
+				if (!DART_CHECK_BIT(2, FLAG_STEP_DONE)) {
+					// 第三发镖完成标志位
+				}
+				return;
+			}
+
+			// 第四发镖
+			if (cur == 3) {
+				if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_LOAD_POS)) {
+					// 扳机移动到装弹位置
+				}
+				if (!DART_CHECK_BIT(3, FLAG_RELOAD_ROTATED)) {
+					// 旋转换弹电机到达旋转位置
+				}
+				if (!DART_CHECK_BIT(3, FLAG_ARM_ANGLE_READY)) {
+					// 机械臂角度到达位置
+				}
+				if (!DART_CHECK_BIT(3, FLAG_DART_DROPPED)) {
+					// 关闭电磁铁，放下飞镖
+				}
+				if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS)) {
+					// 扳机移动到发射位置
+				}
+				if (!DART_CHECK_BIT(3, FLAG_FIRED)) {
+					// 扳机打开，发射飞镖
+				}
+				if (!DART_CHECK_BIT(3, FLAG_STEP_DONE)) {
+					// 第四发镖完成标志位
+				}
+				return;
+			}
+		}
 		break;
 	default:
 		break;

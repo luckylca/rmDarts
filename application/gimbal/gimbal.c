@@ -8,6 +8,7 @@
 #include "robot_def.h"
 #include "user_lib.h"
 #include "controller.h"
+#include "status.h"
 static DJIMotorInstance *yaw_motor;
 static Publisher_t *gimbal_pub;  // 云台应用消息发布者(云台反馈给cmd)
 static Subscriber_t *gimbal_sub; // cmd控制消息订阅者
@@ -100,6 +101,7 @@ void GimbalTask() {
     DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw); // 这里大概率还需要调节系数
     break;
   case AUTO_DART:
+    /*
     // 这一部分是将视觉数据转换为电机角度
     DJIMotorEnable(yaw_motor);
     if (cyy_target_todo == 1) {
@@ -116,6 +118,45 @@ void GimbalTask() {
     // cyy_target_angle += cyy_test_data * 0.000004;
     // cyy_target_angle = float_constrain(cyy_target_angle, -170.0, 170.0);
     DJIMotorSetRef(yaw_motor, cyy_target_angle);
+    */
+
+    // 第一发镖
+    {
+        uint8_t cur = DartSys.currentStep; 
+        // 防止数组越界
+        if (cur >= 4) return;
+
+        if (cur == 0) {
+            if (!DART_CHECK_BIT(0, FLAG_GIMBAL_AIMED)) {
+                // gimbal定位到目标位置
+            }
+            return;
+        }
+
+        // 第二发镖
+        if (cur == 1) {
+            if (!DART_CHECK_BIT(1, FLAG_GIMBAL_AIMED)) {
+                // gimbal定位到目标位置
+            }
+            return;
+        }
+
+        // 第三发镖
+        if (cur == 2) {
+            if (!DART_CHECK_BIT(2, FLAG_GIMBAL_AIMED)) {
+                // gimbal定位到目标位置
+            }
+            return;
+        }
+
+        // 第四发镖
+        if (cur == 3) {
+            if (!DART_CHECK_BIT(3, FLAG_GIMBAL_AIMED)) {
+                // gimbal定位到目标位置
+            }
+            return;
+        }
+    }
     break;
   default:
     break;

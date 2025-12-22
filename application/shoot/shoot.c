@@ -189,7 +189,7 @@ void ShootInit()
 		.can_init_config =
 			{
 				.can_handle = &hcan1,
-				.tx_id = 5,
+				.tx_id = 4,
 			},
 		.controller_param_init_config =
 			{
@@ -508,6 +508,8 @@ void ShootTask()
 		DMMotorStop(rotateChageDarts);
 		break;
 	case SHOOT_TEST:
+		DJIMotorEnable(chargeLoader);
+		DMMotorEnable(rotateChageDarts);
 		switch (shoot_cmd_recv.banji_mode)
 		{
 		case BANJI_OFF:
@@ -528,9 +530,9 @@ void ShootTask()
 			DJIMotorSetRef(chargeLoader, 0);			 // 同时设定
 			break;
 		case LOADER_TEST:
+			DJIMotorEnable(chargeLoader);
 			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
 			DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
-			// DJIMotorSetRef(chargeLoader, -5000);
 			break;
 		case AUTO_LOAD:
 			/* code */
@@ -567,13 +569,24 @@ void ShootTask()
 
 			if (cur == 0) {
 				if (!DART_CHECK_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS)) {
-					// 扳机移动到发射位置
+					// 扳机移动到发射位置，这里设置扳机的位置闭环，setref 为一个值就可以了
+					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
+					if(chargeLoader->measure.total_angle==LOADER_SHOOT_25_ANGLE) {// 到达位置后设置标志位
+						DART_SET_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS);
+					}
+					return;
 				}
-				if (!DART_CHECK_BIT(0, FLAG_FIRED)) {
+				if (DART_CHECK_MASK(0, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
+					DWT_Delay(2); // 延时2ms确保扳机打开
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
+					DART_SET_BIT(0, FLAG_FIRED);
 				}
-				if (!DART_CHECK_BIT(0, FLAG_STEP_DONE)) {
+				if (DART_CHECK_BIT(0, FLAG_FIRED)) {
 					// 第一发镖完成标志位,这个时候开始运行旋转换弹的旋转 30°
+					//这里写开始旋转的代码
+					DartSys.currentStep++;
 				}
 				return;
 			}
@@ -582,27 +595,47 @@ void ShootTask()
 			if (cur == 1) {
 				if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_LOAD_POS)) {
 					// 扳机移动到装弹位置
+					DJIMotorSetRef(chargeLoader, LOADER_LOAD_ANGLE);
+					if(chargeLoader->measure.total_angle==LOADER_LOAD_ANGLE) {// 到达位置后设置标志位
+						DART_SET_BIT(1, FLAG_TRIGGER_AT_LOAD_POS);
+					}
 				}
 				if (!DART_CHECK_BIT(1, FLAG_RELOAD_ROTATED)) {
-					// 旋转换弹电机到达旋转位置
+					// 检测旋转换弹电机到达旋转位置
+					if(rotateChageDarts->measure.position==120.0f) {// 这里的值还要改
+						DART_SET_BIT(1, FLAG_RELOAD_ROTATED);
+					}
 				}
-				if (!DART_CHECK_BIT(1, FLAG_ARM_ANGLE_READY)) {
+				if (DART_CHECK_MASK(1, MASK_READY_TO_LOAD)) {
 					// 机械臂角度到达位置
+					ServoSetAngle(gripper1_motor, GRIPPER_LAY_ANGLE);
+					DART_SET_BIT(1, FLAG_ARM_ANGLE_READY);
+					DWT_Delay(2); // 延时2ms确保夹爪放下
+					//这里写关闭电磁铁的代码
+
+					DART_SET_BIT(1, FLAG_DART_DROPPED);
 				}
-				if (!DART_CHECK_BIT(1, FLAG_DART_DROPPED)) {
-					// 关闭电磁铁，放下飞镖
+				if(!DART_CHECK_MASK(1, MASK_READY_TO_SHOOT)) {
+					return;
 				}
-				// if (!shoot_Step_2_RotateChangeDartBegin) {
-				// 	// 这个时候开始运行旋转换弹的旋转 120°
-				// }
 				if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置
+					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
+					if(chargeLoader->measure.total_angle==LOADER_SHOOT_25_ANGLE) {// 到达位置后设置标志位
+						DART_SET_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS);
+					}
 				}
-				if (!DART_CHECK_BIT(1, FLAG_FIRED)) {
+				if (DART_CHECK_MASK(1, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
+					DWT_Delay(2); // 延时2ms确保扳机打开
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
+					DART_SET_BIT(1, FLAG_FIRED);
 				}
-				if (!DART_CHECK_BIT(1, FLAG_STEP_DONE)) {
+				if (DART_CHECK_BIT(1, FLAG_FIRED)) {
 					// 第二发镖完成标志位
+					//这里写开始旋转的代码
+					DartSys.currentStep++;
 				}
 				return;
 			}
@@ -611,27 +644,47 @@ void ShootTask()
 			if (cur == 2) {
 				if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_LOAD_POS)) {
 					// 扳机移动到装弹位置
+					DJIMotorSetRef(chargeLoader, LOADER_LOAD_ANGLE);
+					if(chargeLoader->measure.total_angle==LOADER_LOAD_ANGLE) {// 到达位置后设置标志位
+						DART_SET_BIT(2, FLAG_TRIGGER_AT_LOAD_POS);
+					}
 				}
 				if (!DART_CHECK_BIT(2, FLAG_RELOAD_ROTATED)) {
-					// 旋转换弹电机到达旋转位置
+					// 检测旋转换弹电机到达旋转位置
+					if(rotateChageDarts->measure.position==120.0f) {// 这里的值还要改
+						DART_SET_BIT(2, FLAG_RELOAD_ROTATED);
+					}
 				}
-				if (!DART_CHECK_BIT(2, FLAG_ARM_ANGLE_READY)) {
+				if (DART_CHECK_MASK(2, MASK_READY_TO_LOAD)) {
 					// 机械臂角度到达位置
+					ServoSetAngle(gripper1_motor, GRIPPER_LAY_ANGLE);
+					DART_SET_BIT(2, FLAG_ARM_ANGLE_READY);
+					DWT_Delay(2); // 延时2ms确保夹爪放下
+					//这里写关闭电磁铁的代码
+
+					DART_SET_BIT(2, FLAG_DART_DROPPED);
 				}
-				if (!DART_CHECK_BIT(2, FLAG_DART_DROPPED)) {
-					// 关闭电磁铁，放下飞镖
+				if(!DART_CHECK_MASK(2, MASK_READY_TO_SHOOT)) {
+					return;
 				}
-				// if (!shoot_Step_3_RotateChangeDartBegin) {
-				// 	// 这个时候开始运行旋转换弹的旋转 120°
-				// }
 				if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置
+					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
+					if(chargeLoader->measure.total_angle==LOADER_SHOOT_25_ANGLE) {// 到达位置后设置标志位
+						DART_SET_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS);
+					}
 				}
-				if (!DART_CHECK_BIT(2, FLAG_FIRED)) {
+				if (DART_CHECK_MASK(2, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
+					DWT_Delay(2); // 延时2ms确保扳机打开
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
+					DART_SET_BIT(2, FLAG_FIRED);
 				}
-				if (!DART_CHECK_BIT(2, FLAG_STEP_DONE)) {
+				if (DART_CHECK_BIT(2, FLAG_FIRED)) {
 					// 第三发镖完成标志位
+					//这里写开始旋转的代码
+					DartSys.currentStep++;
 				}
 				return;
 			}
@@ -640,24 +693,46 @@ void ShootTask()
 			if (cur == 3) {
 				if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_LOAD_POS)) {
 					// 扳机移动到装弹位置
+					DJIMotorSetRef(chargeLoader, LOADER_LOAD_ANGLE);
+					if(chargeLoader->measure.total_angle==LOADER_LOAD_ANGLE) {// 到达位置后设置标志位
+						DART_SET_BIT(3, FLAG_TRIGGER_AT_LOAD_POS);
+					}
 				}
 				if (!DART_CHECK_BIT(3, FLAG_RELOAD_ROTATED)) {
-					// 旋转换弹电机到达旋转位置
+					// 检测旋转换弹电机到达旋转位置
+					if(rotateChageDarts->measure.position==120.0f) {// 这里的值还要改
+						DART_SET_BIT(3, FLAG_RELOAD_ROTATED);
+					}
 				}
-				if (!DART_CHECK_BIT(3, FLAG_ARM_ANGLE_READY)) {
+				if (DART_CHECK_MASK(3, MASK_READY_TO_LOAD)) {
 					// 机械臂角度到达位置
+					ServoSetAngle(gripper1_motor, GRIPPER_LAY_ANGLE);
+					DART_SET_BIT(3, FLAG_ARM_ANGLE_READY);
+					DWT_Delay(2); // 延时2ms确保夹爪放下
+					//这里写关闭电磁铁的代码
+
+					DART_SET_BIT(3, FLAG_DART_DROPPED);
 				}
-				if (!DART_CHECK_BIT(3, FLAG_DART_DROPPED)) {
-					// 关闭电磁铁，放下飞镖
+				if(!DART_CHECK_MASK(3, MASK_READY_TO_SHOOT)) {
+					return;
 				}
 				if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置
+					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
+					if(chargeLoader->measure.total_angle==LOADER_SHOOT_25_ANGLE) {// 到达位置后设置标志位
+						DART_SET_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS);
+					}
 				}
-				if (!DART_CHECK_BIT(3, FLAG_FIRED)) {
+				if (DART_CHECK_MASK(3, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
+					DWT_Delay(2); // 延时2ms确保扳机打开
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
+					DART_SET_BIT(3, FLAG_FIRED);
 				}
-				if (!DART_CHECK_BIT(3, FLAG_STEP_DONE)) {
+				if (DART_CHECK_BIT(3, FLAG_FIRED)) {
 					// 第四发镖完成标志位
+					DartSys.currentStep++;
 				}
 				return;
 			}

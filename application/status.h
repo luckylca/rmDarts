@@ -26,11 +26,20 @@
 // 2. 组合掩码 (逻辑判断核心)
 // ==========================================
 
-// [装弹条件]：旋转到位 + 机械臂到位 + 扳机必须缩回到装弹口
+// 旋转换弹并且扳机位置到位了，就可以装弹了
 #define MASK_READY_TO_LOAD (FLAG_RELOAD_ROTATED |  \
-                            FLAG_ARM_ANGLE_READY | \
                             FLAG_TRIGGER_AT_LOAD_POS)
 
+#define MASK_READY_TO_SHOOT (FLAG_RELOAD_ROTATED |  \
+                            FLAG_DART_DROPPED |  \
+                            FLAG_ARM_ANGLE_READY |  \
+                            FLAG_TRIGGER_AT_LOAD_POS)
+
+#define MASK_READY_TO_CHASSIS (FLAG_RELOAD_ROTATED |  \
+                            FLAG_DART_DROPPED |  \
+                            FLAG_ARM_ANGLE_READY |  \
+                            FLAG_TRIGGER_AT_LOAD_POS)
+                            
 // [发射条件]：扳机必须顶出发射位 + 蓄力/反弹电机OK + 云台瞄准OK + 且飞镖已经装进去了
 #define MASK_READY_TO_FIRE (FLAG_TRIGGER_AT_SHOOT_POS |                       \
                             FLAG_L_CHARGE_REACHED | FLAG_R_CHARGE_REACHED |   \

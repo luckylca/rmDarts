@@ -7,6 +7,7 @@
 #include "bsp_log.h"
 
 #define REMOTE_CONTROL_FRAME_SIZE 25u // 遥控器接收的buffer大小
+#define F_DATA_FRAME_SIZE 18u        // 拉力传感器接收的buffer大小
 // 遥控器数据
 static RC_ctrl_t rc_ctrl[2];     //[0]:当前数据TEMP,[1]:上一次的数据LAST.用于按键持续按下和切换的判断
 static uint8_t rc_init_flag = 0; // 遥控器初始化标志位
@@ -296,13 +297,16 @@ double decode_status(uint8_t X6, int32_t weight)
 
 static void f_data_solve(const uint8_t *F_data_buf)
 {
-    weight1 = decode_weight(F_data_buf[2],F_data_buf[3],F_data_buf[4],F_data_buf[5],F_data_buf[6]);
-    result1 = decode_status(F_data_buf[7], weight1); 
-    F_data[0] = result1;
-    
-    weight2 = decode_weight(F_data_buf[10],F_data_buf[11],F_data_buf[12],F_data_buf[13],F_data_buf[14]);
-    result2 = decode_status(F_data_buf[15], weight2);
-    F_data[1] = result2;
+    if (F_data_buf[0] == 0xAA && F_data_buf[17] == 0xBB)
+    {
+        weight1 = decode_weight(F_data_buf[1],F_data_buf[2],F_data_buf[3],F_data_buf[4],F_data_buf[5]);
+        result1 = decode_status(F_data_buf[6], weight1); 
+        F_data[0] = result1;
+        
+        weight2 = decode_weight(F_data_buf[9],F_data_buf[10],F_data_buf[11],F_data_buf[12],F_data_buf[13]);
+        result2 = decode_status(F_data_buf[14], weight2);
+        F_data[1] = result2;
+    }
 }
 
 /**
@@ -334,7 +338,7 @@ double* F_Init(UART_HandleTypeDef *F_usart_handle)
     USART_Init_Config_s conf_F;
     conf_F.module_callback = F_RxCallback;
     conf_F.usart_handle = F_usart_handle;
-    conf_F.recv_buff_size = REMOTE_CONTROL_FRAME_SIZE;
+    conf_F.recv_buff_size = F_DATA_FRAME_SIZE;
     F_usart_instance = USARTRegister(&conf_F);
 
     // 进行守护进程的注册,用于定时检查遥控器是否正常工作

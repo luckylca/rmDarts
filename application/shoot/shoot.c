@@ -65,12 +65,27 @@ extern int flag_3508_max;
 #define dartNoExistWeight 0
 #define dartExistLength 0
 #define dartNoExistLength 0
+#define DM_STEP_VAL 0.2f
+float dm_target_angle = ROTATE_1_CHANGE_DARTS_ANGLE;     // 我们希望最终到达的角度
+float dm_current_setpoint = ROTATE_1_CHANGE_DARTS_ANGLE; // 当前发送给电机的瞬时角度（插值过程量）
+static void rotateSlowMove(void)
+{
+    // 1. 线性插值计算 (Ramp)
+    float diff = dm_target_angle - dm_current_setpoint;
 
-int key = 1;  // 换弹标志
-int step = 0; // 步骤标志
-int f = 0;
-int first_time = 0;
-
+    // 如果误差大于步长，就走一步
+    if (fabs(diff) > DM_STEP_VAL) {
+        if (diff > 0) {
+            dm_current_setpoint += DM_STEP_VAL;
+        } else {
+            dm_current_setpoint -= DM_STEP_VAL;
+        }
+    } else {
+        // 误差很小，直接等于目标值
+        dm_current_setpoint = dm_target_angle;
+    }
+    DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff()); 
+}
 // 计算力矩前馈
 static float calculateTff()
 {
@@ -355,7 +370,6 @@ void ShootTask()
 	//             ServoSetAngle(banji_motor,BANJI_OPEN_ANGLE);
 	//             break;
 	//         case BANJI_AUTO:
-
 	//             if(flag_arm_sucess == 0 || flag_3508_ready == 0 ||
 	//             !flag_3508_max)
 	//             {
@@ -394,7 +408,6 @@ void ShootTask()
 	//             break;
 	//     }
 	// }
-
 	// if(f==0){
 	//     init_angle();
 	// }
@@ -407,7 +420,6 @@ void ShootTask()
 	//     // 自动装载模式
 	//     case AUTO_LOAD:
 	//         DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
-
 	//         // 根据传过来的goal参数实现切换
 	//         switch(goal)
 	//         {
@@ -492,13 +504,7 @@ void ShootTask()
 	//     default:
 	//         break;
 	// }
-
-	// ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
-	// osDelay(1000);
-	// ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-	// osDelay(1000);
 	
-	// BanjiServoStepTest();
 
 	switch (shoot_cmd_recv.shoot_mode)
 	{
@@ -555,18 +561,14 @@ void ShootTask()
 		default:
 			break;
 		}
-
 		break;
 	case SHOOT_AUTO:
 		// 这是整个流程的 auto
-		/* code */
-		
-		// 第一发镖
 		{
 			uint8_t cur = DartSys.currentStep; 
 			// 防止数组越界
 			if (cur >= 4) return;
-
+			rotateSlowMove(); // 旋转换弹电机慢速运行函数
 			if (cur == 0) {
 				if (!DART_CHECK_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置，这里设置扳机的位置闭环，setref 为一个值就可以了
@@ -586,6 +588,7 @@ void ShootTask()
 				if (DART_CHECK_BIT(0, FLAG_FIRED)) {
 					// 第一发镖完成标志位,这个时候开始运行旋转换弹的旋转 30°
 					//这里写开始旋转的代码
+					dm_target_angle = ROTATE_2_CHANGE_DARTS_ANGLE;
 					DartSys.currentStep++;
 				}
 				return;
@@ -602,7 +605,7 @@ void ShootTask()
 				}
 				if (!DART_CHECK_BIT(1, FLAG_RELOAD_ROTATED)) {
 					// 检测旋转换弹电机到达旋转位置
-					if(rotateChageDarts->measure.position==120.0f) {// 这里的值还要改
+					if(rotateChageDarts->measure.position==ROTATE_2_CHANGE_DARTS_ANGLE) {
 						DART_SET_BIT(1, FLAG_RELOAD_ROTATED);
 					}
 				}
@@ -635,6 +638,7 @@ void ShootTask()
 				if (DART_CHECK_BIT(1, FLAG_FIRED)) {
 					// 第二发镖完成标志位
 					//这里写开始旋转的代码
+					dm_target_angle = ROTATE_3_CHANGE_DARTS_ANGLE;
 					DartSys.currentStep++;
 				}
 				return;
@@ -651,7 +655,7 @@ void ShootTask()
 				}
 				if (!DART_CHECK_BIT(2, FLAG_RELOAD_ROTATED)) {
 					// 检测旋转换弹电机到达旋转位置
-					if(rotateChageDarts->measure.position==120.0f) {// 这里的值还要改
+					if(rotateChageDarts->measure.position==ROTATE_3_CHANGE_DARTS_ANGLE) {
 						DART_SET_BIT(2, FLAG_RELOAD_ROTATED);
 					}
 				}
@@ -684,6 +688,7 @@ void ShootTask()
 				if (DART_CHECK_BIT(2, FLAG_FIRED)) {
 					// 第三发镖完成标志位
 					//这里写开始旋转的代码
+					dm_target_angle = ROTATE_4_CHANGE_DARTS_ANGLE;
 					DartSys.currentStep++;
 				}
 				return;
@@ -700,7 +705,7 @@ void ShootTask()
 				}
 				if (!DART_CHECK_BIT(3, FLAG_RELOAD_ROTATED)) {
 					// 检测旋转换弹电机到达旋转位置
-					if(rotateChageDarts->measure.position==120.0f) {// 这里的值还要改
+					if(rotateChageDarts->measure.position==ROTATE_4_CHANGE_DARTS_ANGLE) {
 						DART_SET_BIT(3, FLAG_RELOAD_ROTATED);
 					}
 				}
@@ -741,7 +746,5 @@ void ShootTask()
 	default:
 		break;
 	}
-
-	// 反馈数据,目前暂时没有要设定的反馈数据,后续可能增加应用离线监测以及卡弹反馈
 	PubPushMessage(shoot_pub, (void *)&shoot_feedback_data);
 }

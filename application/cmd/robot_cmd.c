@@ -211,7 +211,7 @@ static void RemoteControlSet()
         {
             rc_data[TEMP].rocker_l_=0;
         }
-        // shoot_cmd_send.shoot_data = 20.0f * (float)rc_data[TEMP].rocker_l1;    //参数要改
+        // shoot_cmd_send.shoot_data = -60.0f * (float)rc_data[TEMP].rocker_l1; 
         shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
         chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
         gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置

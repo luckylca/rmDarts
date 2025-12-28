@@ -163,30 +163,47 @@ static void DecodeVision(uint16_t recv_len)
     // 喂狗，表示通信正常
     DaemonReload(vision_daemon_instance);
     
+    static uint8_t state = 0; // 0:找帧头AA, 1:找帧头55, 2:接收数据
+
     // 处理接收到的每个字节
     for (uint16_t i = 0; i < recv_len; i++)
     {
-        // 使用单字节处理函数存储数据
-        if (process_single_byte(vis_recv_buff[i], vcp_buffer, &vcp_buffer_index, sizeof(Vision_Recv_s)))
+        uint8_t byte = vis_recv_buff[i];
+        
+        switch (state)
         {
-            // 缓冲区已满，数据包完整，复制数据
-            memcpy(&recv_data, vcp_buffer, sizeof(Vision_Recv_s));
+            case 0: // 寻找帧头 0xAA
+                if (byte == 0xAA)
+                    state = 1;
+                break;
             
-            // 设置标志位
-            recv_data.target_state = TARGET_CONVERGING;
-            
-            // vcp_buffer_index 已在 process_single_byte 函数中重置
-        }
-    }
-
-    for (int i = 0; i < recv_len; i++)
-    {
-        if(vis_recv_buff[i] == 0xAA)
-        {
-            if(vis_recv_buff[i+1] == 0x55)
-            {
-                cyy_test_data = (int16_t)(vis_recv_buff[i+3]<<8 | vis_recv_buff[i+4]);
-            }
+            case 1: // 寻找帧头 0x55
+                if (byte == 0x55)
+                {
+                    state = 2;
+                    vcp_buffer_index = 0; // 找到帧头，重置缓冲区索引，准备接收数据
+                }
+                else if (byte != 0xAA) // 如果不是AA，重置；如果是AA，保持在状态1(处理 AA AA 55 的情况)
+                {
+                    state = 0;
+                }
+                break;
+                
+            case 2: // 接收数据
+                vcp_buffer[vcp_buffer_index++] = byte;
+                if (vcp_buffer_index >= sizeof(Vision_Recv_s))
+                {
+                    // 数据包接收完整，复制数据
+                    memcpy(&recv_data, vcp_buffer, sizeof(Vision_Recv_s));
+                    recv_data.target_state = TARGET_CONVERGING;
+                    
+                    // 提取测试数据 (对应原代码的 i+3 和 i+4，即数据的第1和第2字节)
+                    // 原代码: AA 55 [Data0] [Data1] [Data2] ... -> 取 [Data1] [Data2]
+                    cyy_test_data = (int16_t)(vcp_buffer[1] << 8 | vcp_buffer[2]);
+                    
+                    state = 0; // 回到初始状态，寻找下一个包
+                }
+                break;
         }
     }
 }

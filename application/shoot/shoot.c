@@ -68,6 +68,106 @@ extern int flag_3508_max;
 #define DM_STEP_VAL 0.2f
 float dm_target_angle = ROTATE_1_CHANGE_DARTS_ANGLE;     // 我们希望最终到达的角度
 float dm_current_setpoint = ROTATE_1_CHANGE_DARTS_ANGLE; // 当前发送给电机的瞬时角度（插值过程量）
+// 计算力矩前馈
+// static float calculateTff()
+// {
+// 	float roatateAngle = radian_to_degree_dm(&rotateChageDarts->measure.position);
+// 	float tff_temp = 0;
+// 	float sinTmp0, sinTmp1, sinTmp2, cosTmp;
+// 	arm_sin_cos_f32(roatateAngle, &sinTmp0, &cosTmp);
+// 	arm_sin_cos_f32(roatateAngle + 120.0f, &sinTmp1, &cosTmp);
+// 	arm_sin_cos_f32(roatateAngle - 120.0f, &sinTmp2, &cosTmp);
+// 	tff_temp =
+// 		dartExistLength * dartExistWeight * (sinTmp0 - sinTmp1 - sinTmp2); // 全满
+// 	tff_temp = dartExistLength * dartExistWeight * (sinTmp0)-dartNoExistWeight *
+// 			   dartNoExistLength * (sinTmp2)-dartExistLength * dartExistWeight *
+// 			   (sinTmp1); // 1 空
+// 	tff_temp = dartNoExistLength * dartNoExistWeight *
+// 			   (sinTmp0)-dartNoExistLength * dartNoExistWeight *
+// 			   (sinTmp2)-dartExistLength * dartExistWeight * (sinTmp1); // 1,3 空
+// 	tff_temp = dartNoExistLength * dartNoExistWeight *
+// 			   (sinTmp0 - sinTmp1 - sinTmp2); // 全空
+// 	return tff_temp;
+// }
+static float calculateTff()
+{
+    // 1. 获取当前电机角度
+    float roatateAngle = radian_to_degree_dm(&rotateChageDarts->measure.position);
+    
+    // 2. 定义局部变量
+    float tff_temp = 0.0f;
+    float sin1, sin2, sin3, cosTmp;
+    
+    // 3. 计算各个夹爪的实际物理角度 (关键修正！)
+    // 根据你的描述：电机转到30度时，1号臂到达底部(垂直向下，即0度相位)
+    // 所以：Arm1_Angle = Motor_Angle - 30
+    float angle1 = roatateAngle - 30.0f;
+    float angle2 = angle1 + 120.0f;
+    float angle3 = angle1 - 120.0f; // 或者 +240.0f
+
+    // 4. 计算三角函数
+    arm_sin_cos_f32(angle1, &sin1, &cosTmp);
+    arm_sin_cos_f32(angle2, &sin2, &cosTmp);
+    arm_sin_cos_f32(angle3, &sin3, &cosTmp);
+
+    // 5. 确定当前三个臂的质量/力矩系数 (M * g * L)
+    // 使用变量分别代表三个臂的 "m*g*L" 系数
+    float torque_coeff_1, torque_coeff_2, torque_coeff_3;
+    
+    float val_full  = dartExistLength * dartExistWeight;   // 满载时的 m*L (注意：这里还没乘g，如果你的Weight是质量kg，最后要乘9.8)
+    float val_empty = dartNoExistLength * dartNoExistWeight; // 空载时的 m*L
+
+    // 6. 状态机：根据角度判断谁掉了 (逻辑修正)
+    // 注意：这里假设你只正向旋转。如果需要往回转，逻辑一样。
+    // 增加了一点点冗余角度防止边界跳变
+    
+    if (roatateAngle < 30.0f) 
+    {
+        // --- 阶段 0: 0 ~ 30度 ---
+        // 初始状态，全满
+        torque_coeff_1 = val_full;
+        torque_coeff_2 = val_full;
+        torque_coeff_3 = val_full;
+    }
+    else if (roatateAngle < 150.0f)
+    {
+        // --- 阶段 1: 30 ~ 150度 ---
+        // 1号臂已放下 (空)，2、3号满
+        torque_coeff_1 = val_empty;
+        torque_coeff_2 = val_full;
+        torque_coeff_3 = val_full;
+    }
+    else if (roatateAngle < 270.0f)
+    {
+        // --- 阶段 2: 150 ~ 270度 ---
+        // 1号空，3号也放下了 (根据顺时针顺序，下一个到底是2还是3，取决于你的机械安装，这里假设间隔120度是3号)
+        torque_coeff_1 = val_empty;
+        torque_coeff_2 = val_full;
+        torque_coeff_3 = val_empty; 
+    }
+    else
+    {
+        // --- 阶段 3: > 270度 ---
+        // 2号也放下了，全空
+        torque_coeff_1 = val_empty;
+        torque_coeff_2 = val_empty;
+        torque_coeff_3 = val_empty;
+    }
+
+    // 7. 计算总负载力矩 (求和！)
+    // Torque = (m1*L1*sin1) + (m2*L2*sin2) + (m3*L3*sin3)
+    // 假设你的 Weight 变量已经是 力(N) 或者 质量*g
+    // 如果 Weight 只是质量(kg)，这里需要乘以 9.8f
+    float total_load_torque = (torque_coeff_1 * sin1) + 
+                              (torque_coeff_2 * sin2) + 
+                              (torque_coeff_3 * sin3);
+
+    // 8. 输出前馈
+    // 前馈是要“抵抗”负载，所以通常取反
+    tff_temp = -total_load_torque;
+
+    return tff_temp;
+}
 static void rotateSlowMove(void)
 {
     // 1. 线性插值计算 (Ramp)
@@ -86,27 +186,7 @@ static void rotateSlowMove(void)
     }
     DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff()); 
 }
-// 计算力矩前馈
-static float calculateTff()
-{
-	float roatateAngle = radian_to_degree_dm(&rotateChageDarts->measure.position);
-	float tff_temp = 0;
-	float sinTmp0, sinTmp1, sinTmp2, cosTmp;
-	arm_sin_cos_f32(roatateAngle, &sinTmp0, &cosTmp);
-	arm_sin_cos_f32(roatateAngle + 120.0f, &sinTmp1, &cosTmp);
-	arm_sin_cos_f32(roatateAngle - 120.0f, &sinTmp2, &cosTmp);
-	tff_temp =
-		dartExistLength * dartExistWeight * (sinTmp0 - sinTmp1 - sinTmp2); // 全满
-	tff_temp = dartExistLength * dartExistWeight * (sinTmp0)-dartNoExistWeight *
-			   dartNoExistLength * (sinTmp2)-dartExistLength * dartExistWeight *
-			   (sinTmp1); // 1 空
-	tff_temp = dartNoExistLength * dartNoExistWeight *
-			   (sinTmp0)-dartNoExistLength * dartNoExistWeight *
-			   (sinTmp2)-dartExistLength * dartExistWeight * (sinTmp1); // 1,3 空
-	tff_temp = dartNoExistLength * dartNoExistWeight *
-			   (sinTmp0 - sinTmp1 - sinTmp2); // 全空
-	return tff_temp;
-}
+
 
 // 继电器控制函数,新的继电器函数是 PC6，PI6，PI7
 void relay_control(
@@ -217,12 +297,12 @@ void ShootInit()
 					},
 				.speed_PID =
 					{
-						.Kp = 15, // 10
+						.Kp = 25, // 10
 						.Ki = 1,  // 1
 						.Kd = 0,
 						.Improve = PID_Integral_Limit,
 						.IntegralLimit = 5000,
-						.MaxOut = 6000,
+						.MaxOut = 100000,
 					},
 				.current_PID =
 					{
@@ -295,11 +375,11 @@ void ShootInit()
 	shoot_sub = SubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
 }
 
-void init_angle()
-{
-	DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-	f = 1;
-}
+// void init_angle()
+// {
+// 	DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
+// 	f = 1;
+// }
 
 
 /**
@@ -505,7 +585,7 @@ void ShootTask()
 	//         break;
 	// }
 	
-
+	// BanjiServoStepTest(); // 调用舵机阶梯测试函数
 	switch (shoot_cmd_recv.shoot_mode)
 	{
 	case SHOOT_OFF:
@@ -538,6 +618,7 @@ void ShootTask()
 		case LOADER_TEST:
 			DJIMotorEnable(chargeLoader);
 			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
+			// DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
 			DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
 			break;
 		case AUTO_LOAD:

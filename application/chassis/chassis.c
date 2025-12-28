@@ -363,9 +363,21 @@ void ChassisTask()
             if (cur == 2) {
                 if (!DART_CHECK_BIT(2, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(2, FLAG_L_CHARGE_REACHED)) {
                     // 左右3508 蓄力电机到达蓄力位置
+                    DJIMotorSetRef(motor_lf, CHASSIS_3508_LOAD_ANGLE);
+                    DJIMotorSetRef(motor_rf, CHASSIS_3508_LOAD_ANGLE);
+                    if(motor_lf->measure.total_angle==CHASSIS_3508_LOAD_ANGLE && motor_rf->measure.total_angle==CHASSIS_3508_LOAD_ANGLE) {// 到达位置后设置标志位
+                        DART_SET_BIT(2, FLAG_R_CHARGE_REACHED);
+                        DART_SET_BIT(2, FLAG_L_CHARGE_REACHED);
+                    }
                 }
                 if (!DART_CHECK_BIT(2, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(2, FLAG_L_REBOUND_REACHED)) {
                     // 左右3508 反弹电机到达反弹位置
+                    DJIMotorSetRef(motor_lf, CHASSIS_3508_REBOUND_ANGLE);
+                    DJIMotorSetRef(motor_rf, CHASSIS_3508_REBOUND_ANGLE);
+                    if(motor_lf->measure.total_angle==CHASSIS_3508_REBOUND_ANGLE && motor_rf->measure.total_angle==CHASSIS_3508_REBOUND_ANGLE) {// 到达位置后设置标志位 {
+                        DART_SET_BIT(2, FLAG_R_REBOUND_REACHED);
+                        DART_SET_BIT(2, FLAG_L_REBOUND_REACHED);
+                    }
                 }
                 return;
             }

@@ -332,7 +332,7 @@ void ShootInit()
 	Motor_Init_Config_s dm_motor_config = {
 		.can_init_config =
 			{
-				.can_handle = &hcan2,
+				.can_handle = &hcan1,
 				.tx_id = 0x01,
 				.rx_id = 0x00,
 			},
@@ -348,9 +348,9 @@ void ShootInit()
 			{
 				.angle_PID =
 					{
-						.Kp = 3,
-						.Kd = 0.3,
-						.Ki = 0.1,
+						.Kp = 30,
+						.Kd = 1.0,
+						.Ki = 0,
 						.Improve = PID_Integral_Limit ||
 								   PID_ChangingIntegrationRate ||
 								   PID_Trapezoid_Intergral,
@@ -382,20 +382,22 @@ void ShootInit()
 // }
 
 
-/**
- * @brief 阶梯式测试扳机舵机 (非阻塞，需在循环中调用)
- * 从 0 到 0.5，每次增加 0.005f，每步停留 1 秒
- */
 // 将变量提升到函数外部（全局变量），方便在 Ozone Watch 窗口中查看
-float banji_test_current_angle = 0.0f; 
+float servo_test_current_angle = 0.0f; 
 
-void BanjiServoStepTest()
+/**
+ * @brief 通用阶梯式测试舵机函数 (非阻塞)
+ * 固定参数：0.0 ~ 0.5, 步长 0.005, 间隔 1000ms
+ * 注意：使用静态变量维护时间，同一时间只能测试一个舵机
+ * @param servo 舵机实例指针
+ */
+void ServoStepTest(ServoInstance *servo)
 {
     static uint32_t last_move_time = 0;
     const float START_ANGLE = 0.0f;
     const float END_ANGLE = 0.5f;
     const float STEP_SIZE = 0.005f;
-    const uint32_t INTERVAL_MS = 1000; // 1秒
+    const uint32_t INTERVAL_MS = 1000;
 
     // 获取当前时间 (ms)
     uint32_t now = HAL_GetTick();
@@ -406,17 +408,22 @@ void BanjiServoStepTest()
         last_move_time = now;
 
         // 设置舵机角度
-        ServoSetAngle(banji_motor, banji_test_current_angle);
+        ServoSetAngle(servo, servo_test_current_angle);
 
         // 增加角度
-        banji_test_current_angle += STEP_SIZE;
+        servo_test_current_angle += STEP_SIZE;
 
-        // 如果超过最大值，重置为最小值 (或者你可以选择停止)
-        if (banji_test_current_angle > END_ANGLE)
+        // 如果超过最大值，重置为最小值
+        if (servo_test_current_angle > END_ANGLE)
         {
-            banji_test_current_angle = START_ANGLE;
+            servo_test_current_angle = START_ANGLE;
         }
     }
+}
+
+void BanjiServoStepTest()
+{
+    ServoStepTest(banji_motor);
 }
 
 /* 机器人发射机构控制核心任务 */
@@ -586,6 +593,7 @@ void ShootTask()
 	// }
 	
 	// BanjiServoStepTest(); // 调用舵机阶梯测试函数
+	// ServoStepTest(gripper1_motor);
 	switch (shoot_cmd_recv.shoot_mode)
 	{
 	case SHOOT_OFF:
@@ -600,9 +608,11 @@ void ShootTask()
 		{
 		case BANJI_OFF:
 			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+			ServoSetAngle(gripper1_motor, GRIPPER_LAY_ANGLE);
 			break;
 		case BANJI_ON:
 			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
+			ServoSetAngle(gripper1_motor, GRIPPER_NORMAL_ANGLE);
 			break;
 		case BANJI_AUTO:
 			break;

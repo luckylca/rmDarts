@@ -82,7 +82,10 @@ void Error_Handler(void);
 #define INT_GYRO_Pin GPIO_PIN_5
 #define INT_GYRO_GPIO_Port GPIOC
 #define INT_GYRO_EXTI_IRQn EXTI9_5_IRQn
-#define SERVO_Pin GPIO_PIN_9
+#define SERVO_banji_Pin GPIO_PIN_9
+#define SERVO_GRIPPER1_Pin GPIO_PIN_11
+#define SERVO_GRIPPER2_Pin GPIO_PIN_13
+#define SERVO_GRIPPER3_Pin GPIO_PIN_14
 #define SERVO_GPIO_Port GPIOE
 #define CS1_GYRO_Pin GPIO_PIN_0
 #define CS1_GYRO_GPIO_Port GPIOB

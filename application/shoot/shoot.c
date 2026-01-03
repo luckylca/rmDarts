@@ -664,7 +664,7 @@ void ShootTask()
 				if (!DART_CHECK_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置，这里设置扳机的位置闭环，setref 为一个值就可以了
 					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
-					if(chargeLoader->measure.total_angle==LOADER_SHOOT_25_ANGLE) {// 到达位置后设置标志位
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_SHOOT_25_ANGLE)) {// 到达位置后设置标志位
 						DART_SET_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS);
 					}
 					return;
@@ -672,7 +672,7 @@ void ShootTask()
 				if (DART_CHECK_MASK(0, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-					DWT_Delay(2); // 延时2ms确保扳机打开
+					osDelay(500); // 延时2ms确保扳机打开
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
 					DART_SET_BIT(0, FLAG_FIRED);
 				}
@@ -690,13 +690,13 @@ void ShootTask()
 				if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_LOAD_POS)) {
 					// 扳机移动到装弹位置
 					DJIMotorSetRef(chargeLoader, LOADER_LOAD_ANGLE);
-					if(chargeLoader->measure.total_angle==LOADER_LOAD_ANGLE) {// 到达位置后设置标志位
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_LOAD_ANGLE)) {// 到达位置后设置标志位
 						DART_SET_BIT(1, FLAG_TRIGGER_AT_LOAD_POS);
 					}
 				}
 				if (!DART_CHECK_BIT(1, FLAG_RELOAD_ROTATED)) {
 					// 检测旋转换弹电机到达旋转位置
-					if(rotateChageDarts->measure.position==ROTATE_2_CHANGE_DARTS_ANGLE) {
+					if(CHECK_ANGLE_ARRIVED(rotateChageDarts->measure.position, ROTATE_2_CHANGE_DARTS_ANGLE)) {
 						DART_SET_BIT(1, FLAG_RELOAD_ROTATED);
 					}
 				}
@@ -715,14 +715,14 @@ void ShootTask()
 				if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置
 					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
-					if(chargeLoader->measure.total_angle==LOADER_SHOOT_25_ANGLE) {// 到达位置后设置标志位
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_SHOOT_25_ANGLE)) {// 到达位置后设置标志位
 						DART_SET_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS);
 					}
 				}
 				if (DART_CHECK_MASK(1, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-					DWT_Delay(2); // 延时2ms确保扳机打开
+					osDelay(500); // 延时2ms确保扳机打开
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
 					DART_SET_BIT(1, FLAG_FIRED);
 				}
@@ -740,13 +740,13 @@ void ShootTask()
 				if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_LOAD_POS)) {
 					// 扳机移动到装弹位置
 					DJIMotorSetRef(chargeLoader, LOADER_LOAD_ANGLE);
-					if(chargeLoader->measure.total_angle==LOADER_LOAD_ANGLE) {// 到达位置后设置标志位
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_LOAD_ANGLE)) {// 到达位置后设置标志位
 						DART_SET_BIT(2, FLAG_TRIGGER_AT_LOAD_POS);
 					}
 				}
 				if (!DART_CHECK_BIT(2, FLAG_RELOAD_ROTATED)) {
 					// 检测旋转换弹电机到达旋转位置
-					if(rotateChageDarts->measure.position==ROTATE_3_CHANGE_DARTS_ANGLE) {
+					if(CHECK_ANGLE_ARRIVED(rotateChageDarts->measure.position, ROTATE_3_CHANGE_DARTS_ANGLE)) {
 						DART_SET_BIT(2, FLAG_RELOAD_ROTATED);
 					}
 				}
@@ -754,7 +754,7 @@ void ShootTask()
 					// 机械臂角度到达位置
 					ServoSetAngle(gripper1_motor, GRIPPER_LAY_ANGLE);
 					DART_SET_BIT(2, FLAG_ARM_ANGLE_READY);
-					DWT_Delay(2); // 延时2ms确保夹爪放下
+					osDelay(500); // 延时2ms确保夹爪放下
 					//这里写关闭电磁铁的代码
 
 					DART_SET_BIT(2, FLAG_DART_DROPPED);
@@ -765,14 +765,14 @@ void ShootTask()
 				if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置
 					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
-					if(chargeLoader->measure.total_angle==LOADER_SHOOT_25_ANGLE) {// 到达位置后设置标志位
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_SHOOT_25_ANGLE)) {// 到达位置后设置标志位
 						DART_SET_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS);
 					}
 				}
 				if (DART_CHECK_MASK(2, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-					DWT_Delay(2); // 延时2ms确保扳机打开
+					osDelay(500); // 延时2ms确保扳机打开
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
 					DART_SET_BIT(2, FLAG_FIRED);
 				}
@@ -790,13 +790,13 @@ void ShootTask()
 				if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_LOAD_POS)) {
 					// 扳机移动到装弹位置
 					DJIMotorSetRef(chargeLoader, LOADER_LOAD_ANGLE);
-					if(chargeLoader->measure.total_angle==LOADER_LOAD_ANGLE) {// 到达位置后设置标志位
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_LOAD_ANGLE)) {// 到达位置后设置标志位
 						DART_SET_BIT(3, FLAG_TRIGGER_AT_LOAD_POS);
 					}
 				}
 				if (!DART_CHECK_BIT(3, FLAG_RELOAD_ROTATED)) {
 					// 检测旋转换弹电机到达旋转位置
-					if(rotateChageDarts->measure.position==ROTATE_4_CHANGE_DARTS_ANGLE) {
+					if(CHECK_ANGLE_ARRIVED(rotateChageDarts->measure.position, ROTATE_4_CHANGE_DARTS_ANGLE)) {
 						DART_SET_BIT(3, FLAG_RELOAD_ROTATED);
 					}
 				}
@@ -804,7 +804,7 @@ void ShootTask()
 					// 机械臂角度到达位置
 					ServoSetAngle(gripper1_motor, GRIPPER_LAY_ANGLE);
 					DART_SET_BIT(3, FLAG_ARM_ANGLE_READY);
-					DWT_Delay(2); // 延时2ms确保夹爪放下
+					osDelay(500); // 延时2ms确保夹爪放下
 					//这里写关闭电磁铁的代码
 
 					DART_SET_BIT(3, FLAG_DART_DROPPED);
@@ -815,14 +815,14 @@ void ShootTask()
 				if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置
 					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
-					if(chargeLoader->measure.total_angle==LOADER_SHOOT_25_ANGLE) {// 到达位置后设置标志位
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_SHOOT_25_ANGLE)) {// 到达位置后设置标志位
 						DART_SET_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS);
 					}
 				}
 				if (DART_CHECK_MASK(3, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-					DWT_Delay(2); // 延时2ms确保扳机打开
+					osDelay(500); // 延时2ms确保扳机打开
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
 					DART_SET_BIT(3, FLAG_FIRED);
 				}

@@ -134,7 +134,7 @@ void RobotCMDInit()
     // rc_data = RemoteControlInit(&huart3);   // 修改为对应串口,注意如果是自研板dbus协议串口需选用添加了反相器的那个
     rc_data = MCControlInit(&huart3);
 
-    F_data = F_Init(&huart6);
+    F_data = F_Init(&huart1);
 
     vision_recv_data = VisionInit(&huart2); // 视觉通信串口，这个不实际占用串口
     

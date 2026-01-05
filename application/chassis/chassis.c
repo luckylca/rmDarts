@@ -168,7 +168,7 @@ void ChassisInit()
 
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
     // referee_data = UITaskInit(&huart6,&ui_data); // 裁判系统初始化,会同时初始化UI
-    referee_data = ReTaskInit(&huart1); // 裁判系统初始化
+    // referee_data = ReTaskInit(&huart1); // 裁判系统初始化
 #endif 
 
 

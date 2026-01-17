@@ -67,10 +67,10 @@ static void sbus_to_mc(const uint8_t *sbus_buf)
         // mc_ctrl[TEMP].none[8] = ((sbus_buf[20] >> 2 | sbus_buf[21] << 6) & 0x07FF);
         // mc_ctrl[TEMP].none[9] = ((sbus_buf[21] >> 5 | sbus_buf[22] << 3) & 0x07FF);
         
-        mc_data_dead_limit(mc_ctrl[TEMP].rocker_l_,5);
-        mc_data_dead_limit(mc_ctrl[TEMP].rocker_l1,5);
-        mc_data_dead_limit(mc_ctrl[TEMP].rocker_r_,5);
-        mc_data_dead_limit(mc_ctrl[TEMP].rocker_r1,5);
+        if (abs(mc_ctrl[TEMP].rocker_l_) <= 50) mc_ctrl[TEMP].rocker_l_ = 0;
+        if (abs(mc_ctrl[TEMP].rocker_l1) <= 50) mc_ctrl[TEMP].rocker_l1 = 0;
+        if (abs(mc_ctrl[TEMP].rocker_r_) <= 50) mc_ctrl[TEMP].rocker_r_ = 0;
+        if (abs(mc_ctrl[TEMP].rocker_r1) <= 50) mc_ctrl[TEMP].rocker_r1 = 0;
 
         mc_data_change(mc_ctrl[TEMP].switch_l);
         mc_data_change(mc_ctrl[TEMP].switch_r);

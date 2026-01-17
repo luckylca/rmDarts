@@ -194,35 +194,28 @@ void relay_control(
 	unsigned int state) // 继器函数，number编号，state状态，1高0低
 {
 	// PWm丝印第一排从右往左io口
-	//  PE11
-	//  PE13
-	//  PE14
 	//  PC6
+	// PI6
+	// PI7
 	switch (number)
 	{
 	case 1:
 		if (state == 0)
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_RESET);
-		else if (state == 1)
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_SET);
-		break;
-	case 2:
-		if (state == 0)
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_13, GPIO_PIN_RESET);
-		else if (state == 1)
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_13, GPIO_PIN_SET);
-		break;
-	case 3:
-		if (state == 0)
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_14, GPIO_PIN_RESET);
-		else if (state == 1)
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_14, GPIO_PIN_SET);
-		break;
-	case 4:
-		if (state == 0)
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
 		else if (state == 1)
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+		break;
+	case 2:
+		if (state == 0)
+			HAL_GPIO_WritePin(GPIOI, GPIO_PIN_6, GPIO_PIN_RESET);
+		else if (state == 1)
+			HAL_GPIO_WritePin(GPIOI, GPIO_PIN_6, GPIO_PIN_SET);
+		break;
+	case 3:
+		if (state == 0)
+			HAL_GPIO_WritePin(GPIOI, GPIO_PIN_7, GPIO_PIN_RESET);
+		else if (state == 1)
+			HAL_GPIO_WritePin(GPIOI, GPIO_PIN_7, GPIO_PIN_SET);
 		break;
 	default:
 		break;
@@ -332,7 +325,7 @@ void ShootInit()
 	Motor_Init_Config_s dm_motor_config = {
 		.can_init_config =
 			{
-				.can_handle = &hcan1,
+				.can_handle = &hcan2,
 				.tx_id = 0x01,
 				.rx_id = 0x00,
 			},
@@ -609,10 +602,17 @@ void ShootTask()
 		case BANJI_OFF:
 			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
 			ServoSetAngle(gripper1_motor, GRIPPER_LAY_ANGLE);
+			ServoSetAngle(gripper2_motor,GRIPPER_LAY_ANGLE);
+			ServoSetAngle(gripper3_motor,GRIPPER_LAY_ANGLE);
+			// ServoSetAngle(gripper1_motor,GRIPPER_CLOSE_ANGLE);
+			// ServoSetAngle(gripper2_motor,GRIPPER_CLOSE_ANGLE);
+			// ServoSetAngle(gripper3_motor,GRIPPER_CLOSE_ANGLE);
 			break;
 		case BANJI_ON:
 			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
 			ServoSetAngle(gripper1_motor, GRIPPER_NORMAL_ANGLE);
+			ServoSetAngle(gripper2_motor,GRIPPER_NORMAL_ANGLE);
+			ServoSetAngle(gripper3_motor,GRIPPER_NORMAL_ANGLE);
 			break;
 		case BANJI_AUTO:
 			break;
@@ -644,7 +644,7 @@ void ShootTask()
 			break;
 		case ROTATE_TEST:
 			float tff = calculateTff();
-			DMMotorSetRef(rotateChageDarts, shoot_cmd_recv.rotate_rate, tff);
+			DMMotorSetRef(rotateChageDarts, shoot_cmd_recv.rotate_rate, 0);
 			break;
 		case ROTATE_AUTO:
 			/* code */

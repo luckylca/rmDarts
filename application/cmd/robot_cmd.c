@@ -138,7 +138,7 @@ void RobotCMDInit()
 
     vision_recv_data = VisionInit(&huart2); // 视觉通信串口，这个不实际占用串口
     
-    readAllMotorAngle(); // 从EEPROM加载所有电机总角度数据
+    // readAllMotorAngle(); // 从EEPROM加载所有电机总角度数据
     // imageRoad_data = ImageRoadTaskInit(&huart1);
     Vision_angle.pitch = 0;
     Vision_angle.yaw = 0;

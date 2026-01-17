@@ -24,6 +24,7 @@
 #include "referee_UI.h"
 #include "arm_math.h"
 #include <stdbool.h>
+#include "at24c02.h"
 
 /* 底盘应用包含的模块和信息存储,底盘是单例模式,因此不需要为底盘建立单独的结构体 */
 #ifdef CHASSIS_BOARD // 如果是底盘板,使用板载IMU获取底盘转动角速度
@@ -147,7 +148,7 @@ void ChassisInit()
 
     // 初始化同步PID
     PID_Init_Config_s sync_pid_conf = {
-        .Kp = 5.0f,
+        .Kp = 10.0f,
         .Ki = 0.0f,
         .Kd = 0.0f,
         .MaxOut = 2000.0f,
@@ -163,9 +164,12 @@ void ChassisInit()
     motor_lf->motor_controller.current_feedforward_ptr = &sync_out;
     motor_rf->motor_controller.current_feedforward_ptr = &sync_out;
 
-
-    
-
+    Motor_Recoder_Init_Config_s recoder_config;
+    recoder_config.type = DJI_MOTOR;
+    recoder_config.data.dji = motor_lf; 
+    motorRecoderRegister(&recoder_config);
+    recoder_config.data.dji = motor_rf; 
+    motorRecoderRegister(&recoder_config);
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
     // referee_data = UITaskInit(&huart6,&ui_data); // 裁判系统初始化,会同时初始化UI
     // referee_data = ReTaskInit(&huart1); // 裁判系统初始化

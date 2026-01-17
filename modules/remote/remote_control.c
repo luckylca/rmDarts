@@ -327,7 +327,7 @@ static void FLostCallback(void *id)
 {
     F_data[0] = 0; // 清空拉力传感器数据
     F_data[1] = 0;
-    HAL_UART_Transmit(&huart6, rs485buf, 5, 1000);
+    HAL_UART_Transmit((UART_HandleTypeDef *)id, rs485buf, 5, 1000);
     USARTServiceInit(F_usart_instance); // 尝试重新启动接收
     LOGWARNING("[F] remote control lost");
 }

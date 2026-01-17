@@ -19,6 +19,7 @@
 #include "bsp_log.h"
 #include "robot_cmd.h" 
 #include "encoder.h"
+#include "at24c02.h"
 
 osThreadId insTaskHandle;
 osThreadId robotTaskHandle;
@@ -34,7 +35,7 @@ void StartMOTORTASK(void const *argument);
 void StartENCODERTASK(void const *argument);
 void StartDAEMONTASK(void const *argument);
 void StartROBOTTASK(void const *argument);
-void StartUITASK(void const *argument);
+void StartRecodeAngle(void const *argument);
 void StartUART1TASK(void const *argument);
 void StartUART6TASK(void const *argument);
 
@@ -61,6 +62,9 @@ void OSTaskInit()
 
     osThreadDef(encodertask, StartENCODERTASK, osPriorityNormal, 0, 128);
     encoderTaskHandle = osThreadCreate(osThread(encodertask), NULL);
+
+    // osThreadDef(recodeangletask, StartRecodeAngle, osPriorityNormal, 0, 512);
+    // osThreadCreate(osThread(recodeangletask), NULL);
     // 因为要用串口六测试，先把ui禁止了
     // osThreadDef(uitask, StartUITASK, osPriorityNormal, 0, 512);
     // uiTaskHandle = osThreadCreate(osThread(uitask), NULL);
@@ -164,16 +168,20 @@ __attribute__((noreturn)) void StartENCODERTASK(void const *argument)
     }
 }
 
-__attribute__((noreturn)) void StartUITASK(void const *argument)
+__attribute__((noreturn)) void StartRecodeAngle(void const *argument)
 {
-    LOGINFO("[freeRTOS] UI Task Start");
-    MyUIInit();
-    LOGINFO("[freeRTOS] UI Init Done, communication with ref has established");
+    static float recoder_dt;
+    static float recoder_start;
+    LOGINFO("[freeRTOS] ENCODER Task Start");
+    // 200Hz-500Hz,若有额外的控制任务如平衡步兵可能需要提升至1kHz
     for (;;)
     {
-        // 每给裁判系统发送一包数据会挂起一次,详见UITask函数的refereeSend()
-        UITask();
-        osDelay(1); // 即使没有任何UI需要刷新,也挂起一次,防止卡在UITask中无法切换
+        recoder_start = DWT_GetTimeline_ms();
+        RecodeAngleTask();
+        recoder_dt = DWT_GetTimeline_ms() - recoder_start;
+        if (recoder_dt > 5)
+            LOGERROR("[freeRTOS] ENCODER Task is being DELAY! dt = [%f]", &recoder_dt);
+        osDelay(100);
     }
 }
 

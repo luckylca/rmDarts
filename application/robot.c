@@ -2,7 +2,7 @@
 #include "robot.h"
 #include "robot_def.h"
 #include "robot_task.h"
-
+#include "at24c02.h"
 // 编译warning,提醒开发者修改机器人参数
 #ifndef ROBOT_DEF_PARAM_WARNING
 #define ROBOT_DEF_PARAM_WARNING
@@ -30,6 +30,7 @@ void RobotInit()
     BSPInit();
 
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
+    HAL_UART_Transmit(&huart1, rs485buf, 5, 1000);
     RobotCMDInit();//初始化扳机
     GimbalInit();//yaw 轴初始化
     ShootInit();//初始化扳机加上龙门架的 2006
@@ -38,12 +39,11 @@ void RobotInit()
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
     ChassisInit();//拉簧电机初始化 3508
 #endif
-
+    motorDataInit(); // 初始化电机数据
     OSTaskInit(); // 创建基础任务
 
     // 初始化完成,开启中断
     __enable_irq();
-    HAL_UART_Transmit(&huart1, rs485buf, 5, 1000);
 }
 
 void RobotTask()

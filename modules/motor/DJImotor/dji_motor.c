@@ -199,12 +199,12 @@ DJIMotorInstance *DJIMotorInit(Motor_Init_Config_s *config)
     instance->motor_type = config->motor_type;
     instance->motor_settings = config->controller_setting_init_config;
 
-    if(config->storage_type == USE_STORAGE)
-    {
-        instance->storage_type = USE_STORAGE;
-        instance->measure.total_angle = DjiMotorTotalAngleSet[idx];
-        instance->measure.total_round = instance->measure.total_angle / 360.0f;
-    }
+    // if(config->storage_type == USE_STORAGE)
+    // {
+    //     instance->storage_type = USE_STORAGE;
+    //     instance->measure.total_angle = DjiMotorTotalAngleSet[idx];
+    //     instance->measure.total_round = instance->measure.total_angle / 360.0f;
+    // }
     // 初始化滤波器
     DJIMotorFilterInit(&instance->measure);
 
@@ -291,11 +291,11 @@ void DJIMotorControl()
         motor_setting = &motor->motor_settings;
         motor_controller = &motor->motor_controller;
         measure = &motor->measure;
-        if (motor->storage_type == USE_STORAGE)
-        {
-            writeDjiMotorAngle(i, (int32_t)(measure->total_angle)); // 存储电机总角度
-            // writeDjiMotorAngle(i, (int32_t)0); // 存储电机总角度
-        }
+        // if (motor->storage_type == USE_STORAGE)
+        // {
+        //     writeDjiMotorAngle(i, (int32_t)(measure->total_angle)); // 存储电机总角度
+        //     // writeDjiMotorAngle(i, (int32_t)0); // 存储电机总角度
+        // }
         pid_ref = motor_controller->pid_ref; // 保存设定值,防止motor_controller->pid_ref在计算过程中被修改
         if (motor_setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)
             pid_ref *= -1; // 设置反转

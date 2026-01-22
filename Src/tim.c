@@ -506,12 +506,14 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
     PI7     ------> TIM8_CH3
     PI6     ------> TIM8_CH2
     */
+    /* // 注释掉 TIM8 对 PI6 和 PI7 的占用，供继电器使用
     GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_6;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF3_TIM8;
     HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
+    */
 
   /* USER CODE BEGIN TIM8_MspPostInit 1 */
 

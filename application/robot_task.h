@@ -63,8 +63,8 @@ void OSTaskInit()
     osThreadDef(encodertask, StartENCODERTASK, osPriorityNormal, 0, 128);
     encoderTaskHandle = osThreadCreate(osThread(encodertask), NULL);
 
-    // osThreadDef(recodeangletask, StartRecodeAngle, osPriorityNormal, 0, 512);
-    // osThreadCreate(osThread(recodeangletask), NULL);
+    osThreadDef(recodeangletask, StartRecodeAngle, osPriorityNormal, 0, 512);
+    osThreadCreate(osThread(recodeangletask), NULL);
     // 因为要用串口六测试，先把ui禁止了
     // osThreadDef(uitask, StartUITASK, osPriorityNormal, 0, 512);
     // uiTaskHandle = osThreadCreate(osThread(uitask), NULL);
@@ -173,13 +173,14 @@ __attribute__((noreturn)) void StartRecodeAngle(void const *argument)
     static float recoder_dt;
     static float recoder_start;
     LOGINFO("[freeRTOS] ENCODER Task Start");
+    motorDataInit();
     // 200Hz-500Hz,若有额外的控制任务如平衡步兵可能需要提升至1kHz
     for (;;)
     {
         recoder_start = DWT_GetTimeline_ms();
         RecodeAngleTask();
         recoder_dt = DWT_GetTimeline_ms() - recoder_start;
-        if (recoder_dt > 5)
+        if (recoder_dt > 15)
             LOGERROR("[freeRTOS] ENCODER Task is being DELAY! dt = [%f]", &recoder_dt);
         osDelay(100);
     }

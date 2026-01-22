@@ -148,13 +148,13 @@ void ChassisInit()
 
     // 初始化同步PID
     PID_Init_Config_s sync_pid_conf = {
-        .Kp = 10.0f,
-        .Ki = 0.0f,
+        .Kp = 50.0f,
+        .Ki = 5.0f,
         .Kd = 0.0f,
-        .MaxOut = 2000.0f,
+        .MaxOut = 20000.0f,
         .DeadBand = 0,
         .Improve = PID_Integral_Limit | PID_Derivative_On_Measurement,
-        .IntegralLimit = 1000.0f,
+        .IntegralLimit = 10000.0f,
     };
     PIDInit(&sync_pid, &sync_pid_conf);
 
@@ -164,12 +164,12 @@ void ChassisInit()
     motor_lf->motor_controller.current_feedforward_ptr = &sync_out;
     motor_rf->motor_controller.current_feedforward_ptr = &sync_out;
 
-    Motor_Recoder_Init_Config_s recoder_config;
-    recoder_config.type = DJI_MOTOR;
-    recoder_config.data.dji = motor_lf; 
-    motorRecoderRegister(&recoder_config);
-    recoder_config.data.dji = motor_rf; 
-    motorRecoderRegister(&recoder_config);
+    // Motor_Recoder_Init_Config_s recoder_config;
+    // recoder_config.type = DJI_MOTOR;
+    // recoder_config.data.dji = motor_lf; 
+    // motorRecoderRegister(&recoder_config);
+    // recoder_config.data.dji = motor_rf; 
+    // motorRecoderRegister(&recoder_config);
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
     // referee_data = UITaskInit(&huart6,&ui_data); // 裁判系统初始化,会同时初始化UI
     // referee_data = ReTaskInit(&huart1); // 裁判系统初始化
@@ -234,8 +234,10 @@ void ChassisTask()
         case CHASSIS_TEST: 
             DJIMotorOuterLoop(motor_lf, ANGLE_LOOP);
             DJIMotorOuterLoop(motor_rf, ANGLE_LOOP);
-            DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);//2000 左右能动
+            DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
+            // DJIMotorSetRef(motor_lf, CHASSIS_3508_LOAD_ANGLE);
+            // DJIMotorSetRef(motor_rf, CHASSIS_3508_LOAD_ANGLE);
             break;
         case AUTO_MODE: {
             /*
@@ -346,7 +348,7 @@ void ChassisTask()
                 //第一发镖，第一发镖只需要当扳机达到发射位置就可以了，所以基本上一启动就开始蓄力
                 if (!DART_CHECK_BIT(0, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(0, FLAG_L_CHARGE_REACHED)) {
                     // 左右3508 蓄力电机到达蓄力位置
-                    DJIMotorSetRef(motor_lf, CHASSIS_3508_LOAD_ANGLE);
+                    DJIMotorSetRef(motor_lf, -CHASSIS_3508_LOAD_ANGLE);
                     DJIMotorSetRef(motor_rf, CHASSIS_3508_LOAD_ANGLE);
                     if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, CHASSIS_3508_LOAD_ANGLE) && 
                        CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, CHASSIS_3508_LOAD_ANGLE)) {// 到达位置后设置标志位
@@ -359,7 +361,7 @@ void ChassisTask()
                 }
                 if (!DART_CHECK_BIT(0, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(0, FLAG_L_REBOUND_REACHED)) {
                     // 左右3508 反弹电机到达反弹位置
-                    DJIMotorSetRef(motor_lf, CHASSIS_3508_REBOUND_ANGLE);
+                    DJIMotorSetRef(motor_lf, -CHASSIS_3508_REBOUND_ANGLE);
                     DJIMotorSetRef(motor_rf, CHASSIS_3508_REBOUND_ANGLE);
                     if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, CHASSIS_3508_REBOUND_ANGLE) && 
                        CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, CHASSIS_3508_REBOUND_ANGLE)) {// 到达位置后设置标志位 {
@@ -374,7 +376,7 @@ void ChassisTask()
             if (cur == 1) {
                 if (!DART_CHECK_BIT(1, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(1, FLAG_L_CHARGE_REACHED)) {
                     // 左右3508 蓄力电机到达蓄力位置
-                    DJIMotorSetRef(motor_lf, CHASSIS_3508_LOAD_ANGLE);
+                    DJIMotorSetRef(motor_lf, -CHASSIS_3508_LOAD_ANGLE);
                     DJIMotorSetRef(motor_rf, CHASSIS_3508_LOAD_ANGLE);
                     if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, CHASSIS_3508_LOAD_ANGLE) && 
                        CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, CHASSIS_3508_LOAD_ANGLE)) {// 到达位置后设置标志位
@@ -387,7 +389,7 @@ void ChassisTask()
                 }
                 if (!DART_CHECK_BIT(1, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(1, FLAG_L_REBOUND_REACHED)) {
                     // 左右3508 反弹电机到达反弹位置
-                    DJIMotorSetRef(motor_lf, CHASSIS_3508_REBOUND_ANGLE);
+                    DJIMotorSetRef(motor_lf, -CHASSIS_3508_REBOUND_ANGLE);
                     DJIMotorSetRef(motor_rf, CHASSIS_3508_REBOUND_ANGLE);
                     if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, CHASSIS_3508_REBOUND_ANGLE) && 
                        CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, CHASSIS_3508_REBOUND_ANGLE)) {// 到达位置后设置标志位 {
@@ -402,7 +404,7 @@ void ChassisTask()
             if (cur == 2) {
                 if (!DART_CHECK_BIT(2, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(2, FLAG_L_CHARGE_REACHED)) {
                     // 左右3508 蓄力电机到达蓄力位置
-                    DJIMotorSetRef(motor_lf, CHASSIS_3508_LOAD_ANGLE);
+                    DJIMotorSetRef(motor_lf, -CHASSIS_3508_LOAD_ANGLE);
                     DJIMotorSetRef(motor_rf, CHASSIS_3508_LOAD_ANGLE);
                     if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, CHASSIS_3508_LOAD_ANGLE) && 
                        CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, CHASSIS_3508_LOAD_ANGLE)) {// 到达位置后设置标志位
@@ -412,7 +414,7 @@ void ChassisTask()
                 }
                 if (!DART_CHECK_BIT(2, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(2, FLAG_L_REBOUND_REACHED)) {
                     // 左右3508 反弹电机到达反弹位置
-                    DJIMotorSetRef(motor_lf, CHASSIS_3508_REBOUND_ANGLE);
+                    DJIMotorSetRef(motor_lf, -CHASSIS_3508_REBOUND_ANGLE);
                     DJIMotorSetRef(motor_rf, CHASSIS_3508_REBOUND_ANGLE);
                     if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, CHASSIS_3508_REBOUND_ANGLE) && 
                        CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, CHASSIS_3508_REBOUND_ANGLE)) {// 到达位置后设置标志位 {
@@ -427,7 +429,7 @@ void ChassisTask()
             if (cur == 3) {
                 if (!DART_CHECK_BIT(3, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(3, FLAG_L_CHARGE_REACHED)) {
                     // 左右3508 蓄力电机到达蓄力位置
-                    DJIMotorSetRef(motor_lf, CHASSIS_3508_LOAD_ANGLE);
+                    DJIMotorSetRef(motor_lf, -CHASSIS_3508_LOAD_ANGLE);
                     DJIMotorSetRef(motor_rf, CHASSIS_3508_LOAD_ANGLE);
                     if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, CHASSIS_3508_LOAD_ANGLE) && 
                        CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, CHASSIS_3508_LOAD_ANGLE)) {
@@ -440,7 +442,7 @@ void ChassisTask()
                 }
                 if (!DART_CHECK_BIT(3, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(3, FLAG_L_REBOUND_REACHED)) {
                     // 左右3508 反弹电机到达反弹位置
-                    DJIMotorSetRef(motor_lf, CHASSIS_3508_REBOUND_ANGLE);
+                    DJIMotorSetRef(motor_lf, -CHASSIS_3508_REBOUND_ANGLE);
                     DJIMotorSetRef(motor_rf, CHASSIS_3508_REBOUND_ANGLE);
                     if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, CHASSIS_3508_REBOUND_ANGLE) && 
                        CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, CHASSIS_3508_REBOUND_ANGLE)) {

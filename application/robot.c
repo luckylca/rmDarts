@@ -39,7 +39,6 @@ void RobotInit()
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
     ChassisInit();//拉簧电机初始化 3508
 #endif
-    motorDataInit(); // 初始化电机数据
     OSTaskInit(); // 创建基础任务
 
     // 初始化完成,开启中断

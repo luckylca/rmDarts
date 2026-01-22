@@ -17,7 +17,7 @@
 #include "stdint.h"
 #include <math.h> // 需要包含 math.h 以使用 fabsf
 
-#define MOTOR_ANGLE_DEADBAND 1.0f // 允许的误差范围
+#define MOTOR_ANGLE_DEADBAND 10.0f // 允许的误差范围
 #define CHECK_ANGLE_ARRIVED(current, target) (fabsf((current) - (target)) < MOTOR_ANGLE_DEADBAND)
 
 /* 开发板类型定义,烧录时注意不要弄错对应功能;修改定义后需要重新编译,只能存在一个定义! */
@@ -38,8 +38,8 @@
 #define LOADER_LOAD_ANGLE 0.1f    // 扳机装载位置
 #define LOADER_SHOOT_25_ANGLE 0.05f  // 扳机发射基地位置
 #define LOADER_SHOOT_16_ANGLE 0.03f  // 扳机发射前哨站位置
-#define CHASSIS_3508_LOAD_ANGLE 100.0f // 3508蓄力到位角度
-#define CHASSIS_3508_REBOUND_ANGLE 50.0f // 3508反弹到位角度
+#define CHASSIS_3508_LOAD_ANGLE 41000.0f // 3508蓄力到位角度
+#define CHASSIS_3508_REBOUND_ANGLE 6100.0f // 3508反弹到位角度
 #define ROTATE_1_CHANGE_DARTS_ANGLE 0.0f    // 旋转换弹第一发电机绝对位置,也就是初始值
 #define ROTATE_2_CHANGE_DARTS_ANGLE 30.0f // 旋转换弹第二发电机绝对位置
 #define ROTATE_3_CHANGE_DARTS_ANGLE 150.0f // 旋转换弹第三发电机绝对位置
@@ -188,6 +188,7 @@ typedef struct
     float shoot_data;
     float rotate_rate;
     float banjiPos;
+    int GripperTest;
 } Shoot_Ctrl_Cmd_s;
 
 /* ----------------gimbal/shoot/chassis发布的反馈数据----------------*/

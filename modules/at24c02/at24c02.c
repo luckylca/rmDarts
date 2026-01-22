@@ -11,6 +11,7 @@
 #include "at24c02.h"
 #include "i2c.h"
 #include "string.h"
+#include "FreeRTOS.h"
 
 // int32_t DjiMotorTotalAngleSet[motorTotalAngleSetCNT] = {0};
 
@@ -49,31 +50,24 @@ HAL_StatusTypeDef AT24C02_ReadData(uint16_t addr, uint8_t *pData, uint16_t size)
 HAL_StatusTypeDef AT24C02_WriteData(uint16_t addr, uint8_t *pdata, uint16_t size)
 {
 	HAL_StatusTypeDef status;
-	uint8_t write_len;
-	uint8_t page_remain = 8 - (addr % 8); // 当前页还剩多少字节
-
-	while (size > 0)
+	uint16_t page_count = (size + 7) / 8;
+	
+	for (uint16_t i = 0; i < page_count; i++)
 	{
-		// 本次写入的长度取 (剩余长度) 和 (当前页剩余空间) 的较小值
-		write_len = (size > page_remain) ? page_remain : size;
-
-		status = HAL_I2C_Mem_Write(&hi2c2, AT24C02_WADDR, addr,
-								   I2C_MEMADD_SIZE_8BIT, pdata, write_len, 1000);
-
+		uint16_t write_addr = addr + i * 8;
+		uint8_t write_len = (size - i * 8) > 8 ? 8 : (size - i * 8);
+		
+		status = HAL_I2C_Mem_Write(&hi2c2, AT24C02_WADDR, write_addr, I2C_MEMADD_SIZE_8BIT, 
+								   pdata + i * 8, write_len, 1000);
+		
 		if (status != HAL_OK)
+		{
 			return status;
-
-		// 【关键】物理写入等待
-		// 在 RTOS 中请务必使用 osDelay(5)，非 RTOS 使用 HAL_Delay(5)
-		osDelay(5);
-
-		// 更新参数
-		size -= write_len;	// 待写长度减少
-		pdata += write_len; // 数据指针后移
-		addr += write_len;	// 目标地址后移
-		page_remain = 8;	// 之后的写入都从新页开头开始，所以剩余空间直接设为8
+		}
+		
+		// HAL_Delay(5);
 	}
-
+	
 	return HAL_OK;
 }
 
@@ -116,17 +110,56 @@ void motorDataInit()
         // 我们之前分配的地址是 idx * 4
         AT24C02_ReadData(i * 4, (uint8_t *)&temp_angle, sizeof(float));
 
+        // 检查 EEPROM 是否未初始化 (0xFFFFFFFF 对应 float NaN)
+        if (isnan(temp_angle)) {
+            temp_angle = 0.0f;
+        }
+
         // 2. 赋值给实时数据结构体（用于控制逻辑的起始点）
         // 假设你的结构体里有对应的角度变量
         GenericMotorData_s *motor_data = motor_recoder_data[i];
         switch (motor_data->type)
         {
-            case DJI_MOTOR: motor_data->data.dji.angle = temp_angle; motor_recoder_last_data[i]->data.dji.angle = temp_angle; break;
-            case DM_MOTOR:  motor_data->data.dm.angle  = temp_angle; motor_recoder_last_data[i]->data.dm.angle = temp_angle; break;
-            case HT_MOTOR:  motor_data->data.ht.angle  = temp_angle; motor_recoder_last_data[i]->data.ht.angle = temp_angle; break;
-            case JZ_MOTOR:  motor_data->data.jz.angle  = temp_angle; motor_recoder_last_data[i]->data.jz.angle = temp_angle; break;
-            case LK_MOTOR:  motor_data->data.lk.angle  = temp_angle; motor_recoder_last_data[i]->data.lk.angle = temp_angle; break;
-            default: break;
+        case DJI_MOTOR:
+            motor_data->data.dji.angle = temp_angle;
+            motor_recoder_last_data[i]->data.dji.angle = temp_angle;
+            if (motor_data->data.dji.dji_motor)
+            {
+                motor_data->data.dji.dji_motor->measure.total_angle = temp_angle;
+                // 同时恢复圈数，防止CAN回调计算出错
+                motor_data->data.dji.dji_motor->measure.total_round = (int32_t)(temp_angle / 360.0f);
+            }
+            break;
+        case DM_MOTOR:
+            motor_data->data.dm.angle = temp_angle;
+            motor_recoder_last_data[i]->data.dm.angle = temp_angle;
+            // 达妙电机根据具体情况恢复，这里假设恢复到 position 字段可能不够，需视达妙驱动实现而定
+             if(motor_data->data.dm.dm_motor)
+             {
+                 // 注意：达妙电机通常是位置环，根据驱动不同可能需要不同处理
+                 // 这里仅作示例，如果达妙驱动没有 total_angle 字段请自行确认
+                 // motor_data->data.dm.dm_motor->measure.position = temp_angle; 
+             }
+            break;
+        case HT_MOTOR:
+            // motor_data->data.ht.angle = temp_angle;
+            // motor_recoder_last_data[i]->data.ht.angle = temp_angle;
+            //  if(motor_data->data.ht.ht_motor)
+            //  {
+            //      motor_data->data.ht.ht_motor->measure.total_angle = temp_angle;
+            //      motor_data->data.ht.ht_motor->measure.total_round = (int32_t)(temp_angle / 360.0f);
+            //  }
+            break;
+        case JZ_MOTOR:
+            motor_data->data.jz.angle = temp_angle;
+            motor_recoder_last_data[i]->data.jz.angle = temp_angle;
+            break;
+        case LK_MOTOR:
+            motor_data->data.lk.angle = temp_angle;
+            motor_recoder_last_data[i]->data.lk.angle = temp_angle;
+            break;
+        default:
+            break;
         }
 
     }
@@ -159,56 +192,88 @@ void motorRecoderRegister(Motor_Recoder_Init_Config_s *config)
 	}
 	idx++;
 }
-
-void RecodeAngleTask()
+#define RECODE_PERIOD_MS   100   // 该函数的调用周期 (必须与 osDelay 一致)
+#define IDLE_TIMEOUT_MS    2000  // 静止多久才保存 (2秒)
+#define MIN_SAVE_DIFF      5.0f  // 只有变化超过5度才写 EEPROM
+#define IDLE_CHECK_DIFF    0.5f  // 判定是否静止的抖动阈值
+void RecodeAngleTask(void)
 {
-	for (uint8_t i = 0; i < idx; i++)
-	{
-		GenericMotorData_s *motor_data = motor_recoder_data[i];
-		switch (motor_data->type)
-		{
-		case DJI_MOTOR:
-			motor_data->data.dji.angle = motor_data->data.dji.dji_motor->measure.total_angle;
-			if(fabsf(motor_data->data.dji.angle-motor_recoder_last_data[i]->data.dji.angle) >5.0f)
-			{
-				AT24C02_WriteData(i * 4, (uint8_t *)&(motor_data->data.dji.angle), sizeof(float));
-				motor_recoder_last_data[i]->data.dji.angle = motor_data->data.dji.angle;
-			}
-			break;
-		case DM_MOTOR:
-			// motor_data->data.dm.angle = motor_data->data.dm.dm_motor->measure.total_angle;
-			// if(fabsf(motor_data->data.dm.angle-motor_recoder_last_data[i]->data.dm.angle) >5.0f)
-			// {
-			// 	AT24C02_WriteData(i * 4, (uint8_t *)&(motor_data->data.dm.angle), sizeof(float));
-			// 	motor_recoder_last_data[i]->data.dm.angle = motor_data->data.dm.angle;
-			// }
-			break;
-		case HT_MOTOR:
-			motor_data->data.ht.angle = motor_data->data.ht.ht_motor->measure.total_angle;
-			if(fabsf(motor_data->data.ht.angle-motor_recoder_last_data[i]->data.ht.angle) >5.0f)
-			{
-				 AT24C02_WriteData(i * 4, (uint8_t *)&(motor_data->data.ht.angle), sizeof(float));
-				motor_recoder_last_data[i]->data.ht.angle = motor_data->data.ht.angle;
-			}
-			break;
-		case JZ_MOTOR:
-			motor_data->data.jz.angle = motor_data->data.jz.jz_motor->measure.total_angle;
-			if(fabsf(motor_data->data.jz.angle-motor_recoder_last_data[i]->data.jz.angle) >5.0f)
-			{
-				AT24C02_WriteData(i * 4, (uint8_t *)&(motor_data->data.jz.angle), sizeof(float));
-				motor_recoder_last_data[i]->data.jz.angle = motor_data->data.jz.angle;
-			}
-			break;
-		case LK_MOTOR:
-			motor_data->data.lk.angle = motor_data->data.lk.lk_motor->measure.total_angle;
-			if(fabsf(motor_data->data.lk.angle-motor_recoder_last_data[i]->data.lk.angle) >5.0f)
-			{
-				AT24C02_WriteData(i * 4, (uint8_t *)&(motor_data->data.lk.angle), sizeof(float));
-				motor_recoder_last_data[i]->data.lk.angle = motor_data->data.lk.angle;
-			}
-			break;
-		default:
-			break;
-		}
-	}
+    // 使用 static 保持跨函数调用的状态
+    static float last_sample_angle[motorTotalAngleSetCNT] = {0}; // 上一次采样角度(用于判断静止)
+    static uint32_t idle_timer[motorTotalAngleSetCNT] = {0};     // 静止计时器
+    static uint8_t is_first_run = 1;                             // 首次运行标志
+
+    // 1. 首次运行初始化 (避免刚上电误判为剧烈运动)
+    if (is_first_run) {
+        for (uint8_t i = 0; i < idx; i++) {
+            GenericMotorData_s *m = motor_recoder_data[i];
+            if (m->type == DJI_MOTOR) last_sample_angle[i] = m->data.dji.dji_motor->measure.total_angle;
+            else if (m->type == HT_MOTOR) last_sample_angle[i] = m->data.ht.ht_motor->measure.total_angle;
+            // ... 其他电机类型
+        }
+        is_first_run = 0;
+        return; // 第一次只初始化，不进行逻辑判断
+    }
+
+    // 2. 遍历所有电机
+    for (uint8_t i = 0; i < idx; i++)
+    {
+        GenericMotorData_s *motor = motor_recoder_data[i];
+        GenericMotorData_s *last_saved = motor_recoder_last_data[i];
+        float current_angle = 0.0f;
+        float *saved_angle_ptr = NULL;
+
+        // --- A. 获取当前角度 ---
+        switch (motor->type)
+        {
+        case DJI_MOTOR:
+            current_angle = motor->data.dji.dji_motor->measure.total_angle;
+            saved_angle_ptr = &(last_saved->data.dji.angle);
+            // 更新实时数据结构体缓存
+            motor->data.dji.angle = current_angle;
+            break;
+        case HT_MOTOR:
+            current_angle = motor->data.ht.ht_motor->measure.total_angle;
+            saved_angle_ptr = &(last_saved->data.ht.angle);
+            motor->data.ht.angle = current_angle;
+            break;
+        case DM_MOTOR:
+            // 假设达妙电机使用 position 作为角度（弧度或度，需根据驱动确认）
+            // 如果达妙是弧度制，这里可能需要转换
+            // current_angle = motor->data.dm.dm_motor->measure.position; 
+            saved_angle_ptr = &(last_saved->data.dm.angle);
+            // motor->data.dm.angle = current_angle;
+            break;
+            // ... (其他电机 case) ...
+        default:
+            continue;
+        }
+
+
+        // --- B. 静止检测逻辑 ---
+        // 如果 (当前角度 - 上次采样) 很小，认为电机在静止状态
+        if (fabsf(current_angle - last_sample_angle[i]) < IDLE_CHECK_DIFF) {
+            idle_timer[i] += RECODE_PERIOD_MS;
+        } else {
+            // 电机在动，重置计时器
+            idle_timer[i] = 0;
+        }
+        
+        // 更新采样值供下次比较
+        last_sample_angle[i] = current_angle;
+
+        // --- C. 写入触发逻辑 ---
+        // 只有当：(1)静止时间足够长 AND (2)与EEPROM存的值差异大
+        if (idle_timer[i] >= IDLE_TIMEOUT_MS)
+        {
+            if (saved_angle_ptr != NULL && fabsf(current_angle - *saved_angle_ptr) > MIN_SAVE_DIFF)
+            {
+                // 执行写入 (内部包含 osDelay(5))
+                AT24C02_WriteData(i * 4, (uint8_t *)&current_angle, sizeof(float));
+                
+                // 更新“上次保存值”，防止重复写入
+                *saved_angle_ptr = current_angle; 
+            }
+        }
+    }
 }

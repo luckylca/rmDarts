@@ -213,10 +213,11 @@ static void RemoteControlSet()
         }
         shoot_cmd_send.shoot_data = -100.0f * (float)rc_data[TEMP].rocker_l1; 
         // shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
-        chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
+        // chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
+        chassis_cmd_send.v1 = -20.0f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
         gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
         // shoot_cmd_send.rotate_rate += 30.0f * (float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
-        shoot_cmd_send.rotate_rate += 0.000001f*(float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
+        shoot_cmd_send.rotate_rate += 0.000005f*(float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
     }
     else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_DOWN) // 
     {
@@ -228,6 +229,7 @@ static void RemoteControlSet()
     }
     else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_UP)
     {
+    #ifdef VIRSION
         chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_AUTO;
         shoot_cmd_send.load_mode = AUTO_LOAD;
@@ -280,22 +282,30 @@ static void RemoteControlSet()
 
         // shoot_cmd_send.shoot_data += 0.1f * (float)rc_data[TEMP].rc.rocker_r_;    //参数  要改
         // chassis_cmd_send.v1 = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
+    #endif
+    chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
+    gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
+    shoot_cmd_send.shoot_mode = SHOOT_OFF;
+    shoot_cmd_send.load_mode = LOAD_STOP;
+    shoot_cmd_send.rotate_mode = ROTATE_STOP;
+    gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;//底盘的位置
+
     }
 
     //下面是对每个模式的细化设置，就是在 TEST 模式下的对某个模块做其他测试
     if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_MID) // 
     {   
         shoot_cmd_send.banji_mode = BANJI_OFF;
-        shoot_cmd_send.GripperTest = 1;
+        shoot_cmd_send.GripperTest=1;
     }
     else if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_DOWN)// || vision_recv_data->target_state == NO_TARGET
     {
         shoot_cmd_send.banji_mode = BANJI_ON;
-        shoot_cmd_send.GripperTest = 0;
+        shoot_cmd_send.GripperTest=0;
     }
     else if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_UP) // 左 侧开关状态[上],
     {
-        shoot_cmd_send.GripperTest = 2;
+        shoot_cmd_send.GripperTest=2;
     }                        
     #endif
 

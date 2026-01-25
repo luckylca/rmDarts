@@ -23,6 +23,36 @@ static USARTInstance *vision_usart_instance;
 static uint8_t vision_recv_buffer[sizeof(Vision_Recv_s)];  // 用于接收数据的缓冲区
 static uint16_t vision_recv_index = 0;                     // 当前处理位置
 
+#define ERR_FILTER_LEN 20
+static float err_filter_buf[ERR_FILTER_LEN] = {0};
+static uint8_t filter_idx = 0;
+
+/**
+ * @brief 视觉误差滑动均值滤波
+ * @param new_value 新的误差值
+ * @return float 滤波后的误差值
+ */
+static float VisionErrFilter(float new_value)
+{
+    // 更新缓存
+    err_filter_buf[filter_idx] = new_value;
+    filter_idx++;
+    
+    if (filter_idx >= ERR_FILTER_LEN)
+    {
+        filter_idx = 0;
+    }
+
+    // 计算平均值
+    float sum = 0.0f;
+    for (uint8_t i = 0; i < ERR_FILTER_LEN; i++)
+    {
+        sum += err_filter_buf[i];
+    }
+    
+    return sum / (float)ERR_FILTER_LEN;
+}
+
 void VisionSetFlag(Enemy_Color_e enemy_color, Work_Mode_e work_mode, Bullet_Speed_e bullet_speed)
 {
     send_data.enemy_color = enemy_color;
@@ -76,6 +106,9 @@ static void ProcessReceivedData()
             // 缓冲区已满，数据包完整，复制数据
             memcpy(&recv_data, vision_recv_buffer, sizeof(Vision_Recv_s));
             
+            // 对err_of_pix进行滑动均值滤波
+            recv_data.err_of_pix = VisionErrFilter(recv_data.err_of_pix);
+
             // 设置标志位
             recv_data.target_state = TARGET_CONVERGING;
             
@@ -158,51 +191,54 @@ int16_t cyy_test_data = 0;
  * @brief 处理接收到的VCP数据
  * @param recv_len 接收到的数据长度
  */
-static void DecodeVision(uint16_t recv_len)
-{
-    // 喂狗，表示通信正常
+static void DecodeVision(uint16_t recv_len) {
     DaemonReload(vision_daemon_instance);
     
-    static uint8_t state = 0; // 0:找帧头AA, 1:找帧头55, 2:接收数据
+    static uint8_t state = 0; 
+    static uint8_t count = 0;
+    static uint8_t calc_checksum = 0;
+    const uint8_t DATA_LEN = sizeof(Vision_Recv_s);
 
-    // 处理接收到的每个字节
-    for (uint16_t i = 0; i < recv_len; i++)
-    {
+    for (uint16_t i = 0; i < recv_len; i++) {
         uint8_t byte = vis_recv_buff[i];
         
-        switch (state)
-        {
-            case 0: // 寻找帧头 0xAA
-                if (byte == 0xAA)
+        switch (state) {
+            case 0: // 找固定帧头 0xAA
+                if (byte == 0xAA) {
                     state = 1;
+                    count = 0; // 准备开始计数
+                    calc_checksum = 0; // 重置校验和
+                }
                 break;
             
-            case 1: // 寻找帧头 0x55
-                if (byte == 0x55)
-                {
-                    state = 2;
-                    vcp_buffer_index = 0; // 找到帧头，重置缓冲区索引，准备接收数据
-                }
-                else if (byte != 0xAA) // 如果不是AA，重置；如果是AA，保持在状态1(处理 AA AA 55 的情况)
-                {
-                    state = 0;
+            case 1: // 接收数据体 (16字节)
+                vcp_buffer[count++] = byte;
+                calc_checksum += byte;
+                if (count >= DATA_LEN) {
+                    state = 2; // 收够了，去检查校验位
                 }
                 break;
                 
-            case 2: // 接收数据
-                vcp_buffer[vcp_buffer_index++] = byte;
-                if (vcp_buffer_index >= sizeof(Vision_Recv_s))
-                {
-                    // 数据包接收完整，复制数据
-                    memcpy(&recv_data, vcp_buffer, sizeof(Vision_Recv_s));
-                    recv_data.target_state = TARGET_CONVERGING;
-                    
-                    // 提取测试数据 (对应原代码的 i+3 和 i+4，即数据的第1和第2字节)
-                    // 原代码: AA 55 [Data0] [Data1] [Data2] ... -> 取 [Data1] [Data2]
-                    cyy_test_data = (int16_t)(vcp_buffer[1] << 8 | vcp_buffer[2]);
-                    
-                    state = 0; // 回到初始状态，寻找下一个包
+            case 2: // 接收校验位 (假设协议里有校验位)
+                if(byte == calc_checksum) {
+                    state = 3; // 校验通过，去检查帧尾
+                } else {
+                    // 校验失败，重置状态机
+                    state = 0;
                 }
+                break;
+
+            case 3: // 检查帧尾 0x55
+                if (byte == 0x55) {
+                    // 只有走到这里，且帧尾正确，才认为数据有效
+                    memcpy(&recv_data, vcp_buffer, DATA_LEN);
+                    // 对err_of_pix进行滑动均值滤波
+                    recv_data.err_of_pix = VisionErrFilter(recv_data.err_of_pix);
+                }
+                state = 0; 
+                break;
+            default:
+                state = 0; 
                 break;
         }
     }
@@ -229,7 +265,7 @@ Vision_Recv_s *VisionInit(UART_HandleTypeDef *_handle)
 
     // 初始化接收数据
     memset(&recv_data, 0, sizeof(Vision_Recv_s));
-    recv_data.target_state = NO_TARGET;
+
 
     return &recv_data;
 }

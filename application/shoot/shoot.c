@@ -221,6 +221,56 @@ void relay_control(
 		break;
 	}
 }
+int isGripper1Init = 0;
+int isGripper2Init = 0;
+int isGripper3Init = 0; 
+static uint32_t gripper1_wait_tick = 0;
+static uint32_t gripper2_wait_tick = 0;
+static uint32_t gripper3_wait_tick = 0;
+void  servo_magnet_init(int *initFlag)
+{
+	// 关闭夹爪磁铁
+	relay_control(1, 0);
+	relay_control(2, 0);
+	relay_control(3, 0);
+
+	if (gripper1_wait_tick == 0)
+		gripper1_wait_tick = HAL_GetTick();
+	
+	if (HAL_GetTick() - gripper1_wait_tick < 1500)
+		ServoSetAngle(gripper1_motor, GRIPPER_NORMAL_ANGLE);
+	else
+	{
+		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
+		isGripper1Init = 1;
+	}
+
+	if (gripper2_wait_tick == 0)
+		gripper2_wait_tick = HAL_GetTick();
+
+	if (HAL_GetTick() - gripper2_wait_tick < 1500)
+		ServoSetAngle(gripper2_motor, GRIPPER_NORMAL_ANGLE);
+	else
+	{
+		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
+		isGripper2Init = 1;
+	}
+
+	if (gripper3_wait_tick == 0)
+		gripper3_wait_tick = HAL_GetTick();
+
+	if (HAL_GetTick() - gripper3_wait_tick < 1500)
+		ServoSetAngle(gripper3_motor, GRIPPER_NORMAL_ANGLE);
+	else
+	{
+		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
+		isGripper3Init = 1;
+	}
+	if(isGripper1Init&&isGripper2Init&&isGripper3Init)
+	{
+		*initFlag = 1;
+	}
+}
 
 void ShootInit()
 {
@@ -344,8 +394,8 @@ void ShootInit()
 						.Kp = 30,
 						.Kd = 1.0,
 						.Ki = 0,
-						.Improve = PID_Integral_Limit ||
-								   PID_ChangingIntegrationRate ||
+						.Improve = PID_Integral_Limit |
+								   PID_ChangingIntegrationRate |
 								   PID_Trapezoid_Intergral,
 						.IntegralLimit = 1,
 					},
@@ -354,8 +404,8 @@ void ShootInit()
 						.Kp = 3,
 						.Kd = 0.3,
 						.Ki = 0.1,
-						.Improve = PID_Integral_Limit ||
-								   PID_ChangingIntegrationRate ||
+						.Improve = PID_Integral_Limit |
+								   PID_ChangingIntegrationRate |
 								   PID_Trapezoid_Intergral,
 						.IntegralLimit = 1,
 					},
@@ -368,6 +418,7 @@ void ShootInit()
 		.data.dji = chargeLoader,
 	};
 	motorRecoderRegister(&recoder_init_config);
+	// servo_magnet_init();
 	shoot_pub = PubRegister("shoot_feed", sizeof(Shoot_Upload_Data_s));
 	shoot_sub = SubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
 }
@@ -424,67 +475,96 @@ void BanjiServoStepTest()
 }
 
 static int isBanjiOpen = 0;
-static uint32_t gripper1_wait_tick = 0;
-static uint32_t gripper2_wait_tick = 0;
-static uint32_t gripper3_wait_tick = 0;
-static int isGripper1Open = 0;
-static int isGripper2Open = 0;
-static int isGripper3Open = 0;
 static uint32_t magnet1_wait_tick = 0;
 static uint32_t magnet2_wait_tick = 0;
 static uint32_t magnet3_wait_tick = 0;
+
+static uint32_t key1_start_tick = 0;
+static uint32_t key2_start_tick = 0;
+static uint32_t key3_start_tick = 0;
+
 void setKey1()
 {
-	if (!isGripper1Open) {
-		gripper1_wait_tick = HAL_GetTick();
-		isGripper1Open = 1;
+	if (key1_start_tick == 0) {
+		key1_start_tick = HAL_GetTick();
+		if(key1_start_tick == 0) key1_start_tick = 1;
 	}
-	if (HAL_GetTick() - gripper1_wait_tick < 1000)
-		ServoSetAngle(gripper1_motor, GRIPPER_LAY_ANGLE);
-	else
-	{
-		magnet1_wait_tick = HAL_GetTick();
-		relay_control(1, 1);
-		if(HAL_GetTick() - magnet1_wait_tick > 500)
-			relay_control(1, 0);
-		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
 
+	uint32_t dt = HAL_GetTick() - key1_start_tick;
+
+	if (dt < 1500) {
+		ServoSetAngle(gripper1_motor, GRIPPER_LAY_ANGLE);
+		relay_control(1, 0);
+	}
+	else if (dt < 2000) { // 1500 + 500
+		ServoSetAngle(gripper1_motor, GRIPPER_LAY_ANGLE);
+		relay_control(1, 1);
+	}
+	else if (dt < 3500) { // 2000 + 1500
+		ServoSetAngle(gripper1_motor, GRIPPER_NORMAL_ANGLE);
+		relay_control(1, 0);
+	}
+	else {
+		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(1, 0);
 	}
 }
+
 void setKey2()
 {
-	if (!isGripper2Open) {
-		gripper2_wait_tick = HAL_GetTick();
-		isGripper2Open = 1;
+	if (key2_start_tick == 0) {
+		key2_start_tick = HAL_GetTick();
+		if(key2_start_tick == 0) key2_start_tick = 1;
 	}
-	if (HAL_GetTick() - gripper2_wait_tick < 1000)
+
+	uint32_t dt = HAL_GetTick() - key2_start_tick;
+
+	if (dt < 1500) {
 		ServoSetAngle(gripper2_motor, GRIPPER_LAY_ANGLE);
-	else
-	{
-		magnet2_wait_tick = HAL_GetTick();
+		relay_control(2, 0);
+	}
+	else if (dt < 2000) {
+		ServoSetAngle(gripper2_motor, GRIPPER_LAY_ANGLE);
 		relay_control(2, 1);
-		if(HAL_GetTick() - magnet2_wait_tick > 500)
-			relay_control(2, 0);
+	}
+	else if (dt < 3500) {
+		ServoSetAngle(gripper2_motor, GRIPPER_NORMAL_ANGLE);
+		relay_control(2, 0);
+	}
+	else {
 		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(2, 0);
 	}
 }
+
 void setKey3()
 {
-	if (!isGripper3Open) {
-		gripper3_wait_tick = HAL_GetTick();
-		isGripper3Open = 1;
+	if (key3_start_tick == 0) {
+		key3_start_tick = HAL_GetTick();
+		if(key3_start_tick == 0) key3_start_tick = 1;
 	}
-	if (HAL_GetTick() - gripper3_wait_tick < 1000)
+
+	uint32_t dt = HAL_GetTick() - key3_start_tick;
+
+	if (dt < 1500) {
 		ServoSetAngle(gripper3_motor, GRIPPER_LAY_ANGLE);
-	else
-	{
-		magnet3_wait_tick = HAL_GetTick();
+		relay_control(3, 0);
+	}
+	else if (dt < 2000) {
+		ServoSetAngle(gripper3_motor, GRIPPER_LAY_ANGLE);
 		relay_control(3, 1);
-		if(HAL_GetTick() - magnet3_wait_tick > 500)
-			relay_control(3, 0);
+	}
+	else if (dt < 3500) {
+		ServoSetAngle(gripper3_motor, GRIPPER_NORMAL_ANGLE);
+		relay_control(3, 0);
+	}
+	else {
 		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(3, 0);
 	}
 }
+
+int initServoMagnet = 0;
 
 
 /* 机器人发射机构控制核心任务 */
@@ -652,7 +732,9 @@ void ShootTask()
 	//     default:
 	//         break;
 	// }
-	
+	if(!initServoMagnet){
+		servo_magnet_init(&initServoMagnet);
+	}
 	// BanjiServoStepTest(); // 调用舵机阶梯测试函数
 	// ServoStepTest(gripper1_motor);
 	switch (shoot_cmd_recv.shoot_mode)
@@ -800,7 +882,7 @@ void ShootTask()
 				if (DART_CHECK_MASK(0, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-					osDelay(500); // 延时2ms确保扳机打开
+					osDelay(2); // 延时2ms确保扳机打开
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
 					DART_SET_BIT(0, FLAG_FIRED);
 				}
@@ -850,7 +932,7 @@ void ShootTask()
 				if (DART_CHECK_MASK(1, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-					osDelay(500); // 延时2ms确保扳机打开
+					osDelay(2); // 延时2ms确保扳机打开
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
 					DART_SET_BIT(1, FLAG_FIRED);
 				}
@@ -901,7 +983,7 @@ void ShootTask()
 				if (DART_CHECK_MASK(2, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-					osDelay(500); // 延时2ms确保扳机打开
+					osDelay(2); // 延时2ms确保扳机打开
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
 					DART_SET_BIT(2, FLAG_FIRED);
 				}
@@ -952,7 +1034,7 @@ void ShootTask()
 				if (DART_CHECK_MASK(3, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-					osDelay(500); // 延时2ms确保扳机打开
+					osDelay(2); // 延时2ms确保扳机打开
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
 					DART_SET_BIT(3, FLAG_FIRED);
 				}

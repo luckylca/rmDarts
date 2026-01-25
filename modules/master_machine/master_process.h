@@ -37,12 +37,17 @@ typedef enum
 
 typedef struct
 {
-	Fire_Mode_e fire_mode;
-	Target_State_e target_state;
-	Target_Type_e target_type;
+	// Fire_Mode_e fire_mode;
+	// Target_State_e target_state;
+	// Target_Type_e target_type;
 
-	float pitch;
-	float yaw;
+	// float pitch;
+	// float yaw;
+	float err_of_pix;
+	float keep_1;
+	float keep_2;
+	float keep_3;
+
 } Vision_Recv_s;
 
 

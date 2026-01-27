@@ -34,23 +34,27 @@ static uint8_t filter_idx = 0;
  */
 static float VisionErrFilter(float new_value)
 {
-    // 更新缓存
-    err_filter_buf[filter_idx] = new_value;
-    filter_idx++;
+    static float sum = 0.0f;
+    static uint32_t count = 0; // 用于处理冷启动
     
-    if (filter_idx >= ERR_FILTER_LEN)
-    {
-        filter_idx = 0;
+    // 1. 减去即将被覆盖的旧值
+    sum -= err_filter_buf[filter_idx];
+    
+    // 2. 更新缓冲区
+    err_filter_buf[filter_idx] = new_value;
+    
+    // 3. 加上新值
+    sum += new_value;
+    
+    // 4. 更新索引
+    filter_idx = (filter_idx + 1) % ERR_FILTER_LEN;
+
+    // 5. 处理冷启动：在前20次计算时，按实际计数作为分母
+    if (count < ERR_FILTER_LEN) {
+        count++;
     }
 
-    // 计算平均值
-    float sum = 0.0f;
-    for (uint8_t i = 0; i < ERR_FILTER_LEN; i++)
-    {
-        sum += err_filter_buf[i];
-    }
-    
-    return sum / (float)ERR_FILTER_LEN;
+    return sum / (float)count;
 }
 
 void VisionSetFlag(Enemy_Color_e enemy_color, Work_Mode_e work_mode, Bullet_Speed_e bullet_speed)
@@ -233,7 +237,7 @@ static void DecodeVision(uint16_t recv_len) {
                     // 只有走到这里，且帧尾正确，才认为数据有效
                     memcpy(&recv_data, vcp_buffer, DATA_LEN);
                     // 对err_of_pix进行滑动均值滤波
-                    recv_data.err_of_pix = VisionErrFilter(recv_data.err_of_pix);
+                    // recv_data.err_of_pix = VisionErrFilter(recv_data.err_of_pix);
                 }
                 state = 0; 
                 break;

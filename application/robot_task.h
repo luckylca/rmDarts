@@ -191,7 +191,7 @@ __attribute__((noreturn)) void StartUART1TASK(void const *argument)
     LOGINFO("[freeRTOS] UART1 Task Start");
     for (;;)
     {
-        // // 读取串口一的数据
+        // 读取串口一的数据
         // uint8_t data;
         // if (HAL_UART_Receive(&huart1, &data, 1, HAL_MAX_DELAY) == HAL_OK)
         // {

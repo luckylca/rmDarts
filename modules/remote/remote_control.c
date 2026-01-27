@@ -14,14 +14,9 @@ static uint8_t rc_init_flag = 0; // 遥控器初始化标志位
 
 int16_t rc_cyy[6]; // 遥控器数据   
 // 拉力传感器数据
-double F_data[2] = {0};
+static double F_data = 0;
 static uint8_t F_init_flag = 0; 
-static int32_t weight1=0;
-static double  result1=0;
-static int32_t weight2=0;
-static double  result2=0;
-double temp=0;
-double adjusted_weight=0;
+
 // 遥控器拥有的串口实例,因为遥控器是单例,所以这里只有一个,就不封装了
 static USARTInstance *rc_usart_instance;
 static DaemonInstance *rc_daemon_instance;
@@ -273,7 +268,8 @@ double decode_status(uint8_t X6, int32_t weight)
     if (weight_sign) {
         weight = -weight;
     }
-
+    double temp=0;
+    double adjusted_weight=0;
     // 根据小数点位置调整重量显示
     adjusted_weight = weight;
     switch (decimal_point) {
@@ -293,20 +289,14 @@ double decode_status(uint8_t X6, int32_t weight)
     }
 }
 
-
-
 static void f_data_solve(const uint8_t *F_data_buf)
 {
-    if (F_data_buf[0] == 0xAA && F_data_buf[17] == 0xBB)
-    {
-        weight1 = decode_weight(F_data_buf[1],F_data_buf[2],F_data_buf[3],F_data_buf[4],F_data_buf[5]);
-        result1 = decode_status(F_data_buf[6], weight1); 
-        F_data[0] = result1;
-        
-        weight2 = decode_weight(F_data_buf[9],F_data_buf[10],F_data_buf[11],F_data_buf[12],F_data_buf[13]);
-        result2 = decode_status(F_data_buf[14], weight2);
-        F_data[1] = result2;
-    }
+    int32_t weight=0;
+    double  result=0;
+    weight = decode_weight(F_data_buf[2],F_data_buf[3],F_data_buf[4],F_data_buf[5],F_data_buf[6]);
+    result = decode_status(F_data_buf[7], weight); 
+    
+    F_data = result;
 }
 
 /**
@@ -325,8 +315,7 @@ static void F_RxCallback()
  */
 static void FLostCallback(void *id)
 {
-    F_data[0] = 0; // 清空拉力传感器数据
-    F_data[1] = 0;
+    F_data = 0; // 清空拉力传感器数据
     HAL_UART_Transmit((UART_HandleTypeDef *)id, rs485buf, 5, 1000);
     USARTServiceInit(F_usart_instance); // 尝试重新启动接收
     LOGWARNING("[F] remote control lost");
@@ -334,7 +323,7 @@ static void FLostCallback(void *id)
 
 double* F_Init(UART_HandleTypeDef *F_usart_handle)
 {
-    memset(F_data,0,sizeof(F_data));
+    memset(&F_data,0,sizeof(F_data));
     USART_Init_Config_s conf_F;
     conf_F.module_callback = F_RxCallback;
     conf_F.usart_handle = F_usart_handle;
@@ -350,7 +339,7 @@ double* F_Init(UART_HandleTypeDef *F_usart_handle)
     F_daemon_instance = DaemonRegister(&F_daemon_conf);
 
     F_init_flag = 1;
-    return F_data;
+    return &F_data;
 }
 
 uint8_t F_IsOnline()

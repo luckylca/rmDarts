@@ -69,7 +69,7 @@ static float chassis_v1, chassis_v_;     // 将云台系的速度投影到底盘
 static float vt_lf, vt_rf, vt_lb, vt_rb; // 底盘速度解算后的临时输出,待进行限幅
 
 // 拉力传感器数据
-extern double F_data[2];
+extern double F_data;
 // 3508到位标志位
 int flag_3508_ready = 0;
 extern int flag_arm_sucess;

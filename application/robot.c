@@ -43,6 +43,8 @@ void RobotInit()
 
     // 初始化完成,开启中断
     __enable_irq();
+    uint8_t sendData[5] = {17,66,62,17,13};
+    HAL_UART_Transmit(&huart1, sendData, 5, 1000);
 }
 
 void RobotTask()

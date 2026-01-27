@@ -28,6 +28,7 @@
 #define VISION_USE_VCP  // 使用虚拟串口发送视觉数据
 //#define VISION_USE_UART // 使用串口发送视觉数据
 
+// #define VIRSION // 使用视觉数据进行辅助瞄准
 /* 机器人重要参数定义,注意根据不同机器人进行修改,浮点数需要以.0或f结尾,无符号以u结尾 */
 
 #define BANJI_OPEN_ANGLE 0.085f    // 扳机舵机打开角度
@@ -173,7 +174,7 @@ typedef struct
 // cmd发布的云台控制数据,由gimbal订阅
 typedef struct
 { // 云台角度控制
-    float yaw;
+    double yaw;
     float bottom;
     gimbal_mode_e gimbal_mode;
 } Gimbal_Ctrl_Cmd_s;

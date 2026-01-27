@@ -211,13 +211,16 @@ static void RemoteControlSet()
         {
             rc_data[TEMP].rocker_l_=0;
         }
-        shoot_cmd_send.shoot_data = -100.0f * (float)rc_data[TEMP].rocker_l1; 
+        // shoot_cmd_send.shoot_data = -100.0f * (float)rc_data[TEMP].rocker_l1; 
         // shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
         // chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
         chassis_cmd_send.v1 = -20.0f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
         gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
         // shoot_cmd_send.rotate_rate += 30.0f * (float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
         shoot_cmd_send.rotate_rate += 0.000005f*(float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
+        #ifdef VIRSION
+        gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;
+        #endif // DEBUG
     }
     else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_DOWN) // 
     {
@@ -286,7 +289,7 @@ static void RemoteControlSet()
     chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
     gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
     shoot_cmd_send.shoot_mode = SHOOT_OFF;
-    shoot_cmd_send.load_mode = LOAD_STOP;
+    shoot_cmd_send.load_mode = LOADER_TEST;
     shoot_cmd_send.rotate_mode = ROTATE_STOP;
     gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;//底盘的位置
 
@@ -493,21 +496,53 @@ void RobotCMDTask()
 // 拉力传感器任务
 void uart6Task()
 {
-     // RemoteControl_outline_ALARM();
-      // // 读取串口六的数据
-    uint8_t data[4] = {0};
-    if (HAL_UART_Receive(&huart6, data, 4, HAL_MAX_DELAY) == HAL_OK)
-    {
-            // 处理接收到的数据
+    // 1. 准备接收缓冲区，文档规定回传为10个字节 
+    uint8_t rxBuffer[10] = {0}; 
+    uint8_t sendData[5] = {17,66,62,17,13};
     
-            HAL_UART_Transmit_IT(&huart6, data, 4);
+    // 2. 发送数据 (建议先用阻塞发送，确保发完再切接收)
+    // 如果有 RS485 控制引脚：
+    // RS485_TX_ENABLE(); 
+     // 超时设为10ms足够
+    
+    // 3. 切换到接收模式
+    // RS485_RX_ENABLE();
+    
+    // 4. 接收数据：读取10个字节，设置超时为100ms，不要用 MAX_DELAY
+    if (HAL_UART_Receive(&huart1, rxBuffer, 10, 100) == HAL_OK)
+    {
+        // 5. 校验数据头 (0x11, 0x42) 和 结束符 (0x0D) 
+        if(rxBuffer[0] == 0x11 && rxBuffer[1] == 0x42 && rxBuffer[9] == 0x0D)
+        {
+            // 6. 解析重量数据 X1~X5 
+            // 公式：(X5-0x30)*65536 + ... + (X1-0x30)
+            int32_t weight = 0;
+            weight += (rxBuffer[6] - 0x30) * 65536; // X5 (高位)
+            weight += (rxBuffer[5] - 0x30) * 4096;  // X4
+            weight += (rxBuffer[4] - 0x30) * 256;   // X3
+            weight += (rxBuffer[3] - 0x30) * 16;    // X2
+            weight += (rxBuffer[2] - 0x30);         // X1 (低位)
             
-            // 调用你的处理函数
-            RemoteControl_outline_ALARM();      
+            // 7. 处理符号位 (X6 的 bit2) 
+            // X6 是 rxBuffer[7]
+            if ((rxBuffer[7] & 0x04) != 0) // 检查 Bit 2
+            {
+                weight = -weight; // 如果 Bit 2 是 1，则是负数
+            }
+
+            // 数据获取成功，执行你的逻辑
+            // printf("Current Weight: %d\n", weight);
+            RemoteControl_outline_ALARM(); 
+        }
+        else 
+        {
+            // 数据格式不对（校验错误）
+             AlarmSetStatus(remot_alarm, ALARM_OFF);
+        }
     }
     else
     {
+        // 接收超时（断连）
         AlarmSetStatus(remot_alarm, ALARM_OFF);
     }
-
 }

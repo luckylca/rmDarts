@@ -39,7 +39,8 @@ static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信�
 static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息,底盘功率枪口热量与底盘运动状态等
 
 static MC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
-static volatile double *F_data = NULL;
+static volatile double *F_data_1 = NULL;
+static volatile double *F_data_2 = NULL;
 static Vision_Recv_s *vision_recv_data; // 视觉接收数据指针,初始化时返回
 static Vision_Send_s vision_send_data;  // 视觉发送数据
 
@@ -134,8 +135,8 @@ void RobotCMDInit()
     // rc_data = RemoteControlInit(&huart3);   // 修改为对应串口,注意如果是自研板dbus协议串口需选用添加了反相器的那个
     rc_data = MCControlInit(&huart3);
 
-    F_data = F_Init(&huart1);
-
+    F_data_1 = F_Init(&huart1);
+    F_data_2 = F_Init(&huart6);
     vision_recv_data = VisionInit(&huart2); // 视觉通信串口，这个不实际占用串口
     
     // readAllMotorAngle(); // 从EEPROM加载所有电机总角度数据
@@ -179,7 +180,7 @@ static void CalcOffsetAngle()
 {
 
 }
-
+int i = 0;
 /**
  * @brief 控制输入为遥控器(调试时)的模式和控制量设置
  *
@@ -190,6 +191,7 @@ static void RemoteControlSet()
     // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
     if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_MID) 
     {
+        i = 0;
         chassis_cmd_send.chassis_mode = CHASSIS_TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_TEST;
         shoot_cmd_send.rotate_mode = ROTATE_TEST;
@@ -212,7 +214,7 @@ static void RemoteControlSet()
             rc_data[TEMP].rocker_l_=0;
         }
         // shoot_cmd_send.shoot_data = -100.0f * (float)rc_data[TEMP].rocker_l1; 
-        // shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
+        shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
         // chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
         chassis_cmd_send.v1 = -20.0f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
         gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
@@ -224,6 +226,7 @@ static void RemoteControlSet()
     }
     else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_DOWN) // 
     {
+        i = 0;
         chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
         gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
@@ -286,24 +289,37 @@ static void RemoteControlSet()
         // shoot_cmd_send.shoot_data += 0.1f * (float)rc_data[TEMP].rc.rocker_r_;    //参数  要改
         // chassis_cmd_send.v1 = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 1竖直方向
     #endif
-    chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
-    gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
-    shoot_cmd_send.shoot_mode = SHOOT_OFF;
+    // chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
+    // gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
+    // shoot_cmd_send.shoot_mode = SHOOT_OFF;
+    // shoot_cmd_send.load_mode = LOADER_TEST;
+    // shoot_cmd_send.rotate_mode = ROTATE_STOP;
+    // gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;//底盘的位置
+    i = 1;
+    chassis_cmd_send.chassis_mode = CHASSIS_TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
+    shoot_cmd_send.shoot_mode = SHOOT_TEST;
+    shoot_cmd_send.rotate_mode = ROTATE_TEST;
     shoot_cmd_send.load_mode = LOADER_TEST;
-    shoot_cmd_send.rotate_mode = ROTATE_STOP;
-    gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;//底盘的位置
-
+    gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
+    shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
+    // chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
+    chassis_cmd_send.v1 = -20.0f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
+    gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
+    // shoot_cmd_send.rotate_rate += 30.0f * (float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
+    shoot_cmd_send.rotate_rate += 0.000005f*(float)rc_data[TEMP].rocker_r_;     
     }
 
     //下面是对每个模式的细化设置，就是在 TEST 模式下的对某个模块做其他测试
     if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_MID) // 
     {   
-        shoot_cmd_send.banji_mode = BANJI_OFF;
+        if(i==1)
+        {shoot_cmd_send.banji_mode = BANJI_OFF;}
         shoot_cmd_send.GripperTest=1;
     }
     else if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_DOWN)// || vision_recv_data->target_state == NO_TARGET
     {
-        shoot_cmd_send.banji_mode = BANJI_ON;
+        if(i==1)
+        {shoot_cmd_send.banji_mode = BANJI_ON;}
         shoot_cmd_send.GripperTest=0;
     }
     else if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_UP) // 左 侧开关状态[上],

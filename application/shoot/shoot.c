@@ -227,12 +227,12 @@ int isGripper3Init = 0;
 static uint32_t gripper1_wait_tick = 0;
 static uint32_t gripper2_wait_tick = 0;
 static uint32_t gripper3_wait_tick = 0;
-void  servo_magnet_init(int *initFlag)
+void servo_magnet_init(int *initFlag)
 {
 	// 关闭夹爪磁铁
 	relay_control(1, 0);
 	relay_control(2, 0);
-	relay_control(3, 0);
+	relay_control(3, 1);
 
 	if (gripper1_wait_tick == 0)
 		gripper1_wait_tick = HAL_GetTick();
@@ -548,19 +548,19 @@ void setKey3()
 
 	if (dt < 1500) {
 		ServoSetAngle(gripper3_motor, GRIPPER_LAY_ANGLE);
-		relay_control(3, 0);
+		relay_control(3, 1);
 	}
 	else if (dt < 2000) {
 		ServoSetAngle(gripper3_motor, GRIPPER_LAY_ANGLE);
-		relay_control(3, 1);
+		relay_control(3, 0);
 	}
 	else if (dt < 3500) {
 		ServoSetAngle(gripper3_motor, GRIPPER_NORMAL_ANGLE);
-		relay_control(3, 0);
+		relay_control(3, 1);
 	}
 	else {
 		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
-		relay_control(3, 0);
+		relay_control(3, 1);
 	}
 }
 
@@ -823,8 +823,8 @@ void ShootTask()
 			break;
 		case LOADER_TEST:
 			DJIMotorEnable(chargeLoader);
-			// DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-			DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
+			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
+			// DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
 			DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
 			break;
 		case AUTO_LOAD:

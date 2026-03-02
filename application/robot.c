@@ -45,6 +45,7 @@ void RobotInit()
     __enable_irq();
     uint8_t sendData[5] = {17,66,62,17,13};
     HAL_UART_Transmit(&huart1, sendData, 5, 1000);
+    HAL_UART_Transmit(&huart6, sendData, 5, 1000);
 }
 
 void RobotTask()

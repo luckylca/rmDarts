@@ -14,16 +14,16 @@ static uint8_t rc_init_flag = 0; // 遥控器初始化标志位
 
 int16_t rc_cyy[6]; // 遥控器数据   
 // 拉力传感器数据
-static double F_data = 0;
-static uint8_t F_init_flag = 0; 
+static double F_data[2] = {0}; // 改为数组
+static uint8_t F_init_cnt = 0; // 记录初始化次数
 
 // 遥控器拥有的串口实例,因为遥控器是单例,所以这里只有一个,就不封装了
 static USARTInstance *rc_usart_instance;
 static DaemonInstance *rc_daemon_instance;
 
 // 拉力传感器用的串口实例
-static USARTInstance *F_usart_instance;
-static DaemonInstance *F_daemon_instance;
+static USARTInstance *F_usart_instance[2]; // 改为数组
+static DaemonInstance *F_daemon_instance[2]; // 改为数组
 extern uint8_t rs485buf[5];
 /**
  * @brief 矫正遥控器摇杆的值,超过660或者小于-660的值都认为是无效值,置0
@@ -289,62 +289,86 @@ double decode_status(uint8_t X6, int32_t weight)
     }
 }
 
-static void f_data_solve(const uint8_t *F_data_buf)
+static void f_data_solve(const uint8_t *F_data_buf, uint8_t idx)
 {
     int32_t weight=0;
     double  result=0;
     weight = decode_weight(F_data_buf[2],F_data_buf[3],F_data_buf[4],F_data_buf[5],F_data_buf[6]);
     result = decode_status(F_data_buf[7], weight); 
     
-    F_data = result;
+    F_data[idx] = result;
 }
 
 /**
  * @brief 对F_DATA的简单封装,用于注册到bsp_usart的回调函数中
  *
  */
-static void F_RxCallback()
+static void F_RxCallback_1()
 {
-    DaemonReload(F_daemon_instance);         // 先喂狗
-    f_data_solve(F_usart_instance->recv_buff); // 进行协议解析
+    DaemonReload(F_daemon_instance[0]);         // 先喂狗
+    f_data_solve(F_usart_instance[0]->recv_buff, 0); // 进行协议解析
+}
+
+static void F_RxCallback_2()
+{
+    DaemonReload(F_daemon_instance[1]);         // 先喂狗
+    f_data_solve(F_usart_instance[1]->recv_buff, 1); // 进行协议解析
 }
 
 /**
  * @brief 拉力传感器离线的回调函数,注册到守护进程中,串口掉线时调用
  *
  */
-static void FLostCallback(void *id)
+static void FLostCallback_1(void *id)
 {
-    F_data = 0; // 清空拉力传感器数据
+    F_data[0] = 0; // 清空拉力传感器数据
     HAL_UART_Transmit((UART_HandleTypeDef *)id, rs485buf, 5, 1000);
-    USARTServiceInit(F_usart_instance); // 尝试重新启动接收
-    LOGWARNING("[F] remote control lost");
+    USARTServiceInit(F_usart_instance[0]); // 尝试重新启动接收
+    LOGWARNING("[F1] remote control lost");
+}
+
+static void FLostCallback_2(void *id)
+{
+    F_data[1] = 0; // 清空拉力传感器数据
+    HAL_UART_Transmit((UART_HandleTypeDef *)id, rs485buf, 5, 1000);
+    USARTServiceInit(F_usart_instance[1]); // 尝试重新启动接收
+    LOGWARNING("[F2] remote control lost");
 }
 
 double* F_Init(UART_HandleTypeDef *F_usart_handle)
 {
-    memset(&F_data,0,sizeof(F_data));
+    uint8_t idx = F_init_cnt;
+    if (idx >= 2) return NULL; // 防止越界
+
+    memset(&F_data[idx], 0, sizeof(double));
     USART_Init_Config_s conf_F;
-    conf_F.module_callback = F_RxCallback;
+    if (idx == 0) {
+        conf_F.module_callback = F_RxCallback_1;
+    } else {
+        conf_F.module_callback = F_RxCallback_2;
+    }
+    
     conf_F.usart_handle = F_usart_handle;
     conf_F.recv_buff_size = F_DATA_FRAME_SIZE;
-    F_usart_instance = USARTRegister(&conf_F);
+    F_usart_instance[idx] = USARTRegister(&conf_F);
 
     // 进行守护进程的注册,用于定时检查遥控器是否正常工作
     Daemon_Init_Config_s F_daemon_conf = {
-        .reload_count = 200, // 100ms未收到数据视为离线,遥控器的接收频率实际上是1000/14Hz(大约70Hz)
-        .callback = FLostCallback,
-        .owner_id = (void *)F_usart_handle, // 只有1个遥控器,不需要owner_id
+        .reload_count = 200, 
+        .callback = (idx == 0) ? FLostCallback_1 : FLostCallback_2,
+        .owner_id = (void *)F_usart_handle, 
     };
-    F_daemon_instance = DaemonRegister(&F_daemon_conf);
+    F_daemon_instance[idx] = DaemonRegister(&F_daemon_conf);
 
-    F_init_flag = 1;
-    return &F_data;
+    F_init_cnt++;
+    return &F_data[idx];
 }
 
 uint8_t F_IsOnline()
 {
-    if (F_init_flag)
-        return DaemonIsOnline(F_daemon_instance);
+    // 默认检查第一个，或者改为检查所有？
+    // 这里简单处理，只检查第一个，或者根据需要修改接口
+    if (F_init_cnt > 0)
+        return DaemonIsOnline(F_daemon_instance[0]);
     return 0;
 }

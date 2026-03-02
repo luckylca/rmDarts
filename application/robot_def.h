@@ -36,15 +36,15 @@
 #define GRIPPER_CLOSE_ANGLE 0.000f // 扳机舵机发射角度
 #define GRIPPER_LAY_ANGLE 0.090f // 夹爪放置角度
 #define GRIPPER_NORMAL_ANGLE 0.060f // 夹爪正常角度
-#define LOADER_LOAD_ANGLE -960277.0f    // 扳机装载位置
+#define LOADER_LOAD_ANGLE -669497.75f    // 扳机装载位置
 #define LOADER_SHOOT_25_ANGLE 0.05f  // 扳机发射基地位置
 #define LOADER_SHOOT_16_ANGLE 0.03f  // 扳机发射前哨站位置
 #define CHASSIS_3508_LOAD_ANGLE 41000.0f // 3508蓄力到位角度
 #define CHASSIS_3508_REBOUND_ANGLE 6100.0f // 3508反弹到位角度
 #define ROTATE_1_CHANGE_DARTS_ANGLE 0.0f    // 旋转换弹第一发电机绝对位置,也就是初始值
 #define ROTATE_2_CHANGE_DARTS_ANGLE -1.195f // 旋转换弹第二发电机绝对位置
-#define ROTATE_3_CHANGE_DARTS_ANGLE -3.299f // 旋转换弹第三发电机绝对位置
-#define ROTATE_4_CHANGE_DARTS_ANGLE -5.398f // 旋转换弹第四发电机绝对位置
+#define ROTATE_3_CHANGE_DARTS_ANGLE -3.299f // 旋转换弹第三发电机绝对位置 0。9046
+#define ROTATE_4_CHANGE_DARTS_ANGLE -5.398f // 旋转换弹第四发电机绝对位置3。00
 // 检查是否出现主控板定义冲突,只允许一个开发板定义存在,否则编译会自动报错
 #if (defined(ONE_BOARD) && defined(CHASSIS_BOARD)) || \
     (defined(ONE_BOARD) && defined(GIMBAL_BOARD)) ||  \

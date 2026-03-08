@@ -125,6 +125,7 @@ void GimbalTask()
 
         // 第一发镖
         {
+            DJIMotorEnable(yaw_motor);
             uint8_t cur = DartSys.currentStep;
             // 防止数组越界
             if (cur >= 4)
@@ -136,7 +137,10 @@ void GimbalTask()
                 {
                     // gimbal定位到目标位置
                     DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw);
-                    if (CHECK_ANGLE_ARRIVED(yaw_motor->measure.total_angle, gimbal_cmd_recv.yaw))
+                    if (CHECK_ANGLE_ARRIVED(yaw_motor->measure.total_angle, gimbal_cmd_recv.yaw, MOTOR_ANGLE_DEADBAND))
+                    { // 到达位置后设置标志位
+                        DART_SET_BIT(0, FLAG_GIMBAL_AIMED);
+                    }
                     { // 到达位置后设置标志位
                         DART_SET_BIT(0, FLAG_GIMBAL_AIMED);
                     }
@@ -151,7 +155,7 @@ void GimbalTask()
                 {
                     // gimbal定位到目标位置
                     DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw);
-                    if (CHECK_ANGLE_ARRIVED(yaw_motor->measure.total_angle, gimbal_cmd_recv.yaw))
+                    if (CHECK_ANGLE_ARRIVED(yaw_motor->measure.total_angle, gimbal_cmd_recv.yaw, MOTOR_ANGLE_DEADBAND))
                     { // 到达位置后设置标志位
                         DART_SET_BIT(1, FLAG_GIMBAL_AIMED);
                     }
@@ -166,7 +170,7 @@ void GimbalTask()
                 {
                     // gimbal定位到目标位置
                     DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw);
-                    if (CHECK_ANGLE_ARRIVED(yaw_motor->measure.total_angle, gimbal_cmd_recv.yaw))
+                    if (CHECK_ANGLE_ARRIVED(yaw_motor->measure.total_angle, gimbal_cmd_recv.yaw, MOTOR_ANGLE_DEADBAND))
                     { // 到达位置后设置标志位
                         DART_SET_BIT(2, FLAG_GIMBAL_AIMED);
                     }
@@ -181,7 +185,7 @@ void GimbalTask()
                 {
                     // gimbal定位到目标位置
                     DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw);
-                    if (CHECK_ANGLE_ARRIVED(yaw_motor->measure.total_angle, gimbal_cmd_recv.yaw))
+                    if (CHECK_ANGLE_ARRIVED(yaw_motor->measure.total_angle, gimbal_cmd_recv.yaw, MOTOR_ANGLE_DEADBAND))
                     { // 到达位置后设置标志位
                         DART_SET_BIT(3, FLAG_GIMBAL_AIMED);
                     }

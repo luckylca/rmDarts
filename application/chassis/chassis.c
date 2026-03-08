@@ -256,6 +256,8 @@ void ChassisTask()
             DJIMotorSetRef(motor_rf, 0);
             break;
         case CHASSIS_TEST: 
+            // DJIMotorOuterLoop(motor_lf, ANGLE_LOOP);
+            // DJIMotorOuterLoop(motor_rf, ANGLE_LOOP);
             DJIMotorOuterLoop(motor_lf, SPEED_LOOP);
             DJIMotorOuterLoop(motor_rf, SPEED_LOOP);
             DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);
@@ -263,124 +265,27 @@ void ChassisTask()
             // DJIMotorSetRef(motor_lf, CHASSIS_3508_LOAD_ANGLE);
             // DJIMotorSetRef(motor_rf, CHASSIS_3508_LOAD_ANGLE);
             break;
-        case AUTO_MODE: {
-            /*
-            // // if(flag_2006_back){
-            //     // 当3508还没有到位，并且拉力小于目标拉力时
-            //     if( (flag_3508_ready == 0 || flag_arm_sucess == 0) && flag_2006_target_ready == false)
-            //     {
-            //         // 等待
-            //         // if(flag_loadok == 0)
-            //         // {
-            //         //     DWT_Delay(2);
-            //         //     // 飞镖装载完毕标志位
-            //         //     flag_loadok = 1;
-            //         // } 
-            //         if(key==1||key==2)
-            //             if(F_data[0] <= FOCE_3508_STAY1)
-            //             {
-            //                 DJIMotorSetRef(motor_lf, SPEED_3508);
-            //                 DJIMotorSetRef(motor_rf, SPEED_3508);
-            //             }
-            //             else
-            //             {
-            //                 DJIMotorSetRef(motor_lf, 0.5*SPEED_3508);
-            //                 DJIMotorSetRef(motor_rf, 0.5*SPEED_3508);                   
-            //             }
-            //         else if(key==3||key==4){
-            //             if(F_data[0] <= FOCE_3508_STAY2)
-            //             {
-            //                 DJIMotorSetRef(motor_lf, SPEED_3508);
-            //                 DJIMotorSetRef(motor_rf, SPEED_3508);
-            //             }
-            //             else
-            //             {
-            //                 DJIMotorSetRef(motor_lf, 0.5*SPEED_3508);
-            //                 DJIMotorSetRef(motor_rf, 0.5*SPEED_3508);                   
-            //             }
-            //         }
-            //     }
-
-            //     else if(flag_arm_sucess == 1 && flag_3508_ready == 1)
-            //     {   
-            //         // 放镖延时
-            //         if(flag_wait_dart_load_delay == 0)
-            //         {
-            //             // goal=ANGLE_16M;
-            //             DWT_Delay(1);
-            //             flag_wait_dart_load_delay=1;
-            //         }
-
-            //         if(!flag_3508_max){
-            //             if(F_data[0] <= FOCE_3508_MAX)
-            //             {
-            //                 DJIMotorSetRef(motor_lf, SPEED_3508);
-            //                 DJIMotorSetRef(motor_rf, SPEED_3508);
-            //             }
-            //             else
-            //             {
-            //                 DJIMotorSetRef(motor_lf, 0.5*SPEED_3508);
-            //                 DJIMotorSetRef(motor_rf, 0.5*SPEED_3508); 
-            //                 flag_3508_max=1;                  
-            //             }     
-            //         }
-
-            //         // 如果2006到位，电机回到原位准备发射
-            //         if(flag_2006_target_ready == true && flag_3508_back == 0 && flag_3508_max)
-            //         {
-            //             // 计算误差
-            //             err_of_original_angle = motor_lf->measure.total_angle - original_angle_left;
-            //             // 归位时不受力所以直接3508到位后拉力给0
-            //             if(err_of_original_angle > 0)
-            //             {
-            //                 DJIMotorSetRef(motor_lf, -SPEED_3508);
-            //                 DJIMotorSetRef(motor_rf, -SPEED_3508);
-            //             }
-            //             else
-            //             {
-            //                 DJIMotorSetRef(motor_lf, 0);
-            //                 DJIMotorSetRef(motor_rf, 0);
-            //                 // 3508归位标志位
-            //                 flag_3508_back = 1;
-            //             }   
-            //         }
-            //         else if(flag_2006_target_ready == false){
-            //             if(F_data[0] <= FOCE_3508_MAX)
-            //             {
-            //                 DJIMotorSetRef(motor_lf, SPEED_3508);
-            //                 DJIMotorSetRef(motor_rf, SPEED_3508);
-            //             }
-            //             else
-            //             {
-            //                 DJIMotorSetRef(motor_lf, 0.5*SPEED_3508);
-            //                 DJIMotorSetRef(motor_rf, 0.5*SPEED_3508);                   
-            //             }                        
-            //         }
-            //     }
-            //     else
-            //     {
-            //         DJIMotorSetRef(motor_lf, 0);
-            //         DJIMotorSetRef(motor_rf, 0);
-            //     }
-            */
-
-            uint8_t cur = DartSys.currentStep; 
-            // 防止数组越界
-            if (cur >= 4) return;
+        case AUTO_MODE: 
+            {
+                DJIMotorEnable(motor_lf);
+                DJIMotorEnable(motor_rf);
+                uint8_t cur = DartSys.currentStep; 
+                // 防止数组越界
+                if (cur >= 4) return;
             
             // 计算目标角度：基于上电初始位置的相对偏移
             float target_lf_load = original_angle_left - CHASSIS_3508_LOAD_ANGLE;
             float target_rf_load = original_angle_right + CHASSIS_3508_LOAD_ANGLE;
             float target_lf_rebound = original_angle_left - CHASSIS_3508_REBOUND_ANGLE;
             float target_rf_rebound = original_angle_right + CHASSIS_3508_REBOUND_ANGLE;
-
+            float motor_v = 16000; 
             if (cur == 0) {
                 //第一发镖
                 if (!DART_CHECK_BIT(0, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(0, FLAG_L_CHARGE_REACHED)) {
-                    DJIMotorSetRef(motor_lf, target_lf_load);
-                    DJIMotorSetRef(motor_rf, target_rf_load);
-                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_load) && 
-                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_load)) {
+                    DJIMotorSetRef(motor_lf, motor_v);
+                    DJIMotorSetRef(motor_rf, motor_v);
+                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_load, MOTOR_ANGLE_DEADBAND) && 
+                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_load, MOTOR_ANGLE_DEADBAND)) {
                         DART_SET_BIT(0, FLAG_R_CHARGE_REACHED);
                         DART_SET_BIT(0, FLAG_L_CHARGE_REACHED);
                     }
@@ -389,10 +294,10 @@ void ChassisTask()
                     return;
                 }
                 if (!DART_CHECK_BIT(0, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(0, FLAG_L_REBOUND_REACHED)) {
-                    DJIMotorSetRef(motor_lf, target_lf_rebound);
-                    DJIMotorSetRef(motor_rf, target_rf_rebound);
-                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_rebound) && 
-                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_rebound)) {
+                    DJIMotorSetRef(motor_lf, motor_v);
+                    DJIMotorSetRef(motor_rf, motor_v);
+                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_rebound, MOTOR_ANGLE_DEADBAND) && 
+                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_rebound, MOTOR_ANGLE_DEADBAND)) {
                         DART_SET_BIT(0, FLAG_R_REBOUND_REACHED);
                         DART_SET_BIT(0, FLAG_L_REBOUND_REACHED);
                     }
@@ -403,10 +308,10 @@ void ChassisTask()
             // 第二发镖
             if (cur == 1) {
                 if (!DART_CHECK_BIT(1, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(1, FLAG_L_CHARGE_REACHED)) {
-                    DJIMotorSetRef(motor_lf, target_lf_load);
-                    DJIMotorSetRef(motor_rf, target_rf_load);
-                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_load) && 
-                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_load)) {
+                    DJIMotorSetRef(motor_lf, motor_v);
+                    DJIMotorSetRef(motor_rf, motor_v);
+                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_load, MOTOR_ANGLE_DEADBAND) && 
+                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_load, MOTOR_ANGLE_DEADBAND)) {
                         DART_SET_BIT(1, FLAG_R_CHARGE_REACHED);
                         DART_SET_BIT(1, FLAG_L_CHARGE_REACHED);
                     }
@@ -415,10 +320,10 @@ void ChassisTask()
                     return;
                 }
                 if (!DART_CHECK_BIT(1, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(1, FLAG_L_REBOUND_REACHED)) {
-                    DJIMotorSetRef(motor_lf, target_lf_rebound);
-                    DJIMotorSetRef(motor_rf, target_rf_rebound);
-                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_rebound) && 
-                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_rebound)) {
+                    DJIMotorSetRef(motor_lf, motor_v);
+                    DJIMotorSetRef(motor_rf, motor_v);
+                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_rebound, MOTOR_ANGLE_DEADBAND) && 
+                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_rebound, MOTOR_ANGLE_DEADBAND)) {
                         DART_SET_BIT(1, FLAG_R_REBOUND_REACHED);
                         DART_SET_BIT(1, FLAG_L_REBOUND_REACHED);
                     }
@@ -429,19 +334,22 @@ void ChassisTask()
             // 第三发镖
             if (cur == 2) {
                 if (!DART_CHECK_BIT(2, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(2, FLAG_L_CHARGE_REACHED)) {
-                    DJIMotorSetRef(motor_lf, target_lf_load);
-                    DJIMotorSetRef(motor_rf, target_rf_load);
-                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_load) && 
-                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_load)) {
+                    DJIMotorSetRef(motor_lf, motor_v);
+                    DJIMotorSetRef(motor_rf, motor_v);
+                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_load, MOTOR_ANGLE_DEADBAND) && 
+                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_load, MOTOR_ANGLE_DEADBAND)) {
                         DART_SET_BIT(2, FLAG_R_CHARGE_REACHED);
                         DART_SET_BIT(2, FLAG_L_CHARGE_REACHED);
                     }
                 }
+                if(!DART_CHECK_BIT(2, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(2, FLAG_L_CHARGE_REACHED)) {
+                    return;
+                }
                 if (!DART_CHECK_BIT(2, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(2, FLAG_L_REBOUND_REACHED)) {
-                    DJIMotorSetRef(motor_lf, target_lf_rebound);
-                    DJIMotorSetRef(motor_rf, target_rf_rebound);
-                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_rebound) && 
-                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_rebound)) {
+                    DJIMotorSetRef(motor_lf, motor_v);
+                    DJIMotorSetRef(motor_rf, motor_v);
+                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_rebound, MOTOR_ANGLE_DEADBAND) && 
+                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_rebound, MOTOR_ANGLE_DEADBAND)) {
                         DART_SET_BIT(2, FLAG_R_REBOUND_REACHED);
                         DART_SET_BIT(2, FLAG_L_REBOUND_REACHED);
                     }
@@ -452,10 +360,10 @@ void ChassisTask()
             // 第四发镖
             if (cur == 3) {
                 if (!DART_CHECK_BIT(3, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(3, FLAG_L_CHARGE_REACHED)) {
-                    DJIMotorSetRef(motor_lf, target_lf_load);
-                    DJIMotorSetRef(motor_rf, target_rf_load);
-                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_load) && 
-                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_load)) {
+                    DJIMotorSetRef(motor_lf, motor_v);
+                    DJIMotorSetRef(motor_rf, motor_v);
+                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_load, MOTOR_ANGLE_DEADBAND) && 
+                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_load, MOTOR_ANGLE_DEADBAND)) {
                         DART_SET_BIT(3, FLAG_R_CHARGE_REACHED);
                         DART_SET_BIT(3, FLAG_L_CHARGE_REACHED);
                     }
@@ -464,16 +372,15 @@ void ChassisTask()
                     return;
                 }
                 if (!DART_CHECK_BIT(3, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(3, FLAG_L_REBOUND_REACHED)) {
-                    DJIMotorSetRef(motor_lf, target_lf_rebound);
-                    DJIMotorSetRef(motor_rf, target_rf_rebound);
-                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_rebound) && 
-                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_rebound)) {
+                    DJIMotorSetRef(motor_lf, motor_v);
+                    DJIMotorSetRef(motor_rf, motor_v);
+                    if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, target_lf_rebound, MOTOR_ANGLE_DEADBAND) && 
+                       CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, target_rf_rebound, MOTOR_ANGLE_DEADBAND)) {
                         DART_SET_BIT(3, FLAG_R_REBOUND_REACHED);
                         DART_SET_BIT(3, FLAG_L_REBOUND_REACHED);
                     }
                 }
-                return;
-            }
+            return;
         }
         break;
 
@@ -495,7 +402,7 @@ void ChassisTask()
         default:
             break;
     }
-
+    }
 
 
 #ifdef ONE_BOARD

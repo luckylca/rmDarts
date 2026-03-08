@@ -18,7 +18,9 @@
 #include <math.h> // 需要包含 math.h 以使用 fabsf
 
 #define MOTOR_ANGLE_DEADBAND 10.0f // 允许的误差范围
-#define CHECK_ANGLE_ARRIVED(current, target) (fabsf((current) - (target)) < MOTOR_ANGLE_DEADBAND)
+#define CHECK_ANGLE_ARRIVED(current, target, DEADBAND) (fabsf((current) - (target)) < (DEADBAND))
+
+
 
 /* 开发板类型定义,烧录时注意不要弄错对应功能;修改定义后需要重新编译,只能存在一个定义! */
 #define ONE_BOARD // 单板控制整车

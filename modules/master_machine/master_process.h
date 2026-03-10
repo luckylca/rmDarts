@@ -77,13 +77,16 @@ typedef enum
 
 typedef struct
 {
-	Enemy_Color_e enemy_color;
-	Work_Mode_e work_mode;
-	Bullet_Speed_e bullet_speed;
+	// Enemy_Color_e enemy_color;
+	// Work_Mode_e work_mode;
+	// Bullet_Speed_e bullet_speed;
 
-	float yaw;
-	float pitch;
-	float roll;
+	// float yaw;
+	// float pitch;
+	// float roll;
+	float encoderAngle;
+	
+
 } Vision_Send_s;
 
 extern RX_PACKET rx_packet;
@@ -119,5 +122,6 @@ void VisionSetFlag(Enemy_Color_e enemy_color, Work_Mode_e work_mode, Bullet_Spee
  * @param pitch
  */
 void VisionSetAltitude(float yaw, float pitch, float roll);
+void VisionSetAngle(float encoderAngle);
 
 #endif // !MASTER_PROCESS_H

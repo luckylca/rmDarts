@@ -256,10 +256,10 @@ void ChassisTask()
             DJIMotorSetRef(motor_rf, 0);
             break;
         case CHASSIS_TEST: 
-            // DJIMotorOuterLoop(motor_lf, ANGLE_LOOP);
-            // DJIMotorOuterLoop(motor_rf, ANGLE_LOOP);
-            DJIMotorOuterLoop(motor_lf, SPEED_LOOP);
-            DJIMotorOuterLoop(motor_rf, SPEED_LOOP);
+            DJIMotorOuterLoop(motor_lf, ANGLE_LOOP);
+            DJIMotorOuterLoop(motor_rf, ANGLE_LOOP);
+            // DJIMotorOuterLoop(motor_lf, SPEED_LOOP);
+            // DJIMotorOuterLoop(motor_rf, SPEED_LOOP);
             DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
             // DJIMotorSetRef(motor_lf, CHASSIS_3508_LOAD_ANGLE);

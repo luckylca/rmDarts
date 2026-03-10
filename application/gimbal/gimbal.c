@@ -9,12 +9,13 @@
 #include "user_lib.h"
 #include "controller.h"
 #include "status.h"
+#include "master_process.h"
 static DJIMotorInstance *yaw_motor;
 static Publisher_t *gimbal_pub;                   // 云台应用消息发布者(云台反馈给cmd)
 static Subscriber_t *gimbal_sub;                  // cmd控制消息订阅者
 static Gimbal_Upload_Data_s gimbal_feedback_data; // 回传给cmd的云台状态信息
 static Gimbal_Ctrl_Cmd_s gimbal_cmd_recv;         // 来自cmd的控制信息
-static EncoderInstance *encoder;
+EncoderInstance *encoder;
 extern int16_t cyy_test_data;
 float cyy_target_angle = 0;
 float cyy_init_angle = 0;
@@ -82,7 +83,7 @@ void GimbalInit()
         .callback = NULL,
         .id = NULL,
     };
-    // encoder = EncoderInit(&encoder_spi_config);
+    encoder = EncoderInit(&encoder_spi_config);
 
     gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     gimbal_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
@@ -92,7 +93,7 @@ void GimbalTask()
 {
 
     SubGetMessage(gimbal_sub, &gimbal_cmd_recv);
-
+    VisionSetAngle(encoder->measure.angle);
     switch (gimbal_cmd_recv.gimbal_mode)
     {
     case GIMBAL_ZERO_FORCE:

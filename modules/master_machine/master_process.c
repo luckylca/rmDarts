@@ -32,43 +32,48 @@ static uint8_t filter_idx = 0;
  * @param new_value 新的误差值
  * @return float 滤波后的误差值
  */
-static float VisionErrFilter(float new_value)
+// static float VisionErrFilter(float new_value)
+// {
+//     static float sum = 0.0f;
+//     static uint32_t count = 0; // 用于处理冷启动
+    
+//     // 1. 减去即将被覆盖的旧值
+//     sum -= err_filter_buf[filter_idx];
+    
+//     // 2. 更新缓冲区
+//     err_filter_buf[filter_idx] = new_value;
+    
+//     // 3. 加上新值
+//     sum += new_value;
+    
+//     // 4. 更新索引
+//     filter_idx = (filter_idx + 1) % ERR_FILTER_LEN;
+
+//     // 5. 处理冷启动：在前20次计算时，按实际计数作为分母
+//     if (count < ERR_FILTER_LEN) {
+//         count++;
+//     }
+
+//     return sum / (float)count;
+// }
+
+// void VisionSetFlag(Enemy_Color_e enemy_color, Work_Mode_e work_mode, Bullet_Speed_e bullet_speed)
+// {
+//     send_data.enemy_color = enemy_color;
+//     send_data.work_mode = work_mode;
+//     send_data.bullet_speed = bullet_speed;
+// }
+
+// void VisionSetAltitude(float yaw, float pitch, float roll)
+// {
+//     send_data.yaw = yaw;
+//     send_data.pitch = pitch;
+//     send_data.roll = roll;
+// }
+
+void VisionSetAngle(float encoderAngle)
 {
-    static float sum = 0.0f;
-    static uint32_t count = 0; // 用于处理冷启动
-    
-    // 1. 减去即将被覆盖的旧值
-    sum -= err_filter_buf[filter_idx];
-    
-    // 2. 更新缓冲区
-    err_filter_buf[filter_idx] = new_value;
-    
-    // 3. 加上新值
-    sum += new_value;
-    
-    // 4. 更新索引
-    filter_idx = (filter_idx + 1) % ERR_FILTER_LEN;
-
-    // 5. 处理冷启动：在前20次计算时，按实际计数作为分母
-    if (count < ERR_FILTER_LEN) {
-        count++;
-    }
-
-    return sum / (float)count;
-}
-
-void VisionSetFlag(Enemy_Color_e enemy_color, Work_Mode_e work_mode, Bullet_Speed_e bullet_speed)
-{
-    send_data.enemy_color = enemy_color;
-    send_data.work_mode = work_mode;
-    send_data.bullet_speed = bullet_speed;
-}
-
-void VisionSetAltitude(float yaw, float pitch, float roll)
-{
-    send_data.yaw = yaw;
-    send_data.pitch = pitch;
-    send_data.roll = roll;
+    send_data.encoderAngle = encoderAngle;
 }
 
 /**
@@ -276,8 +281,32 @@ Vision_Recv_s *VisionInit(UART_HandleTypeDef *_handle)
 
 void VisionSend()
 {
-    // 直接发送send_data结构体数据
-    USBTransmit((uint8_t *)&send_data, sizeof(Vision_Send_s));
+    // 定义常量：包头、包尾、校验和各占1字节
+    const uint8_t header = 0xAA;
+    const uint8_t tail = 0x55;
+    const uint16_t data_len = sizeof(Vision_Send_s);
+    const uint16_t packet_len = data_len + 3; // 头(1) + 数据 + 校验(1) + 尾(1)
+    
+    // 使用静态数组或局部数组作为缓冲区
+    uint8_t send_buff[packet_len];
+    uint8_t checksum = 0;
+    
+    // 1. 填入包头
+    send_buff[0] = header;
+    
+    // 2. 拷贝数据并计算校验和
+    uint8_t *data_ptr = (uint8_t *)&send_data;
+    for (uint16_t i = 0; i < data_len; i++) {
+        send_buff[1 + i] = data_ptr[i];
+        checksum += data_ptr[i];   // 累加计算 Checksum
+    }
+    
+    // 3. 填入校验和与包尾
+    send_buff[1 + data_len] = checksum;
+    send_buff[1 + data_len + 1] = tail;
+    
+    // 4. 发送完整的数据包
+    USBTransmit(send_buff, packet_len);
 }
 
 #endif // VISION_USE_VCP

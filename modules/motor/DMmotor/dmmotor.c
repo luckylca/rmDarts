@@ -116,6 +116,10 @@ void DMMotorSetRef(DMMotorInstance *motor, float ref,float tff)
     motor->tff = tff;
 }
 
+void DMMotorSetKp(DMMotorInstance *motor, float kp)
+{
+    motor->angle_PID.Kp = kp;
+}
 
 void DMMotorEnable(DMMotorInstance *motor)
 {

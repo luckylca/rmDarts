@@ -65,9 +65,49 @@ extern int flag_3508_max;
 #define dartNoExistWeight 0
 #define dartExistLength 0
 #define dartNoExistLength 0
-#define DM_STEP_VAL 0.2f
+#define DM_STEP_VAL 0.0026f // 30度/s 在 200Hz 更新频率下
+#define ROTATE_POWERON_SOFTSTART_MS 700U
+#define ROTATE_POWERON_KP_MIN_RATIO 0.0f
+#define ROTATE_POWERON_KD_MIN_RATIO 0.0f
 float dm_target_angle = ROTATE_1_CHANGE_DARTS_ANGLE;     // 我们希望最终到达的角度
 float dm_current_setpoint = ROTATE_1_CHANGE_DARTS_ANGLE; // 当前发送给电机的瞬时角度（插值过程量）
+static uint8_t rotate_poweron_softstart_done = 0;
+static uint32_t rotate_poweron_softstart_tick = 0;
+static float rotate_angle_kp_nominal = 30.0f;
+static float rotate_angle_kd_nominal = 1.0f;
+
+static float linearRamp(float min_val, float max_val, float progress)
+{
+	if (progress < 0.0f)
+		progress = 0.0f;
+	else if (progress > 1.0f)
+		progress = 1.0f;
+	return min_val + (max_val - min_val) * progress;
+}
+
+static bool updateRotatePowerOnSoftStart(void)
+{
+	if (rotate_poweron_softstart_done) {
+		return false;
+	}
+
+	uint32_t dt = HAL_GetTick() - rotate_poweron_softstart_tick;
+	float progress = (dt >= ROTATE_POWERON_SOFTSTART_MS) ? 1.0f : ((float)dt / (float)ROTATE_POWERON_SOFTSTART_MS);
+	float kp_now = linearRamp(rotate_angle_kp_nominal * ROTATE_POWERON_KP_MIN_RATIO, rotate_angle_kp_nominal, progress);
+	float kd_now = linearRamp(rotate_angle_kd_nominal * ROTATE_POWERON_KD_MIN_RATIO, rotate_angle_kd_nominal, progress);
+	DMMotorSetKp(rotateChageDarts, kp_now);
+	rotateChageDarts->angle_PID.Kd = kd_now;
+
+	// 上电抑振阶段：先锁定当前位置，避免电机被旧参考值/大偏差直接拉扯
+	dm_current_setpoint = rotateChageDarts->measure.position;
+	dm_target_angle = dm_current_setpoint;
+	DMMotorSetRef(rotateChageDarts, dm_current_setpoint, 0.0f);
+
+	if (dt >= ROTATE_POWERON_SOFTSTART_MS) {
+		rotate_poweron_softstart_done = 1;
+	}
+	return !rotate_poweron_softstart_done;
+}
 // 计算力矩前馈
 // static float calculateTff()
 // {
@@ -170,6 +210,13 @@ static float calculateTff()
 }
 static void rotateSlowMove(void)
 {
+    // 如果电机未使能（例如在 SHOOT_OFF 模式），持续同步设定值到当前位置
+    // 这样当进入 SHOOT_AUTO 时，起点就是当前位置，而不是 0
+    if (rotateChageDarts->stop_flag == MOTOR_STOP) {
+        dm_current_setpoint = rotateChageDarts->measure.position;
+        return; 
+    }
+
     // 1. 线性插值计算 (Ramp)
     float diff = dm_target_angle - dm_current_setpoint;
 
@@ -269,6 +316,7 @@ void servo_magnet_init(int *initFlag)
 	if(isGripper1Init&&isGripper2Init&&isGripper3Init)
 	{
 		*initFlag = 1;
+		// DMMotorSetKp(rotateChageDarts, 30.0f); // 达妙电机设置一个初始Kp值，后续可以根据需要调整
 	}
 }
 
@@ -333,14 +381,14 @@ void ShootInit()
 			{
 				.angle_PID =
 					{
-						.Kp = 15, // 10
+						.Kp = 10, // 10
 						.Ki = 0,
-						.Kd = 1,
+						.Kd = 0,
 						.MaxOut = 500000,
 					},
 				.speed_PID =
 					{
-						.Kp = 10, // 10
+						.Kp = 5, // 10
 						.Ki = 1,  // 1
 						.Kd = 0,
 						.Improve = PID_Integral_Limit,
@@ -391,6 +439,7 @@ void ShootInit()
 			{
 				.angle_PID =
 					{
+						// .Kp = 30,
 						.Kp = 30,
 						.Kd = 1.0,
 						.Ki = 0,
@@ -413,11 +462,6 @@ void ShootInit()
 		.motor_type = G6220 // 达妙电机类型
 	};
 	rotateChageDarts = DMMotorInit(&dm_motor_config, DM_MIT_MODE);
-	Motor_Recoder_Init_Config_s recoder_init_config = {
-		.type = DJI_MOTOR,
-		.data.dji = chargeLoader,
-	};
-	motorRecoderRegister(&recoder_init_config);
 	// servo_magnet_init();
 	shoot_pub = PubRegister("shoot_feed", sizeof(Shoot_Upload_Data_s));
 	shoot_sub = SubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
@@ -485,6 +529,13 @@ static uint32_t key3_start_tick = 0;
 
 void setKey1()
 {
+	dm_target_angle = ROTATE_2_CHANGE_DARTS_ANGLE; // 设置目标角度为第二发位置
+	if(fabs(rotateChageDarts->measure.position - dm_target_angle) > 0.1f) // 放宽到位判断阈值
+	{
+		key1_start_tick = 0; // 未到位时重置时间戳
+		return;
+	}
+
 	if (key1_start_tick == 0) {
 		key1_start_tick = HAL_GetTick();
 		if(key1_start_tick == 0) key1_start_tick = 1;
@@ -502,7 +553,7 @@ void setKey1()
 	}
 	else if (dt < 3500) { // 2000 + 1500
 		ServoSetAngle(gripper1_motor, GRIPPER_NORMAL_ANGLE);
-		relay_control(1, 0);
+		relay_control(1, 1);
 	}
 	else {
 		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
@@ -514,12 +565,55 @@ void setKey1()
 
 void setKey2()
 {
+	dm_target_angle = ROTATE_3_CHANGE_DARTS_ANGLE; // 设置目标角度为第三发位置
+	if(fabs(rotateChageDarts->measure.position - dm_target_angle) > 0.1f)
+	{
+		key2_start_tick = 0;
+		return;
+	}
+
 	if (key2_start_tick == 0) {
 		key2_start_tick = HAL_GetTick();
 		if(key2_start_tick == 0) key2_start_tick = 1;
 	}
 
 	uint32_t dt = HAL_GetTick() - key2_start_tick;
+
+	if (dt < 1500) {
+		ServoSetAngle(gripper3_motor, GRIPPER_LAY_ANGLE);
+		relay_control(3, 0);
+	}
+	else if (dt < 2000) {
+		ServoSetAngle(gripper3_motor, GRIPPER_LAY_ANGLE);
+		relay_control(3, 1);
+	}
+	else if (dt < 3500) {
+		ServoSetAngle(gripper3_motor, GRIPPER_NORMAL_ANGLE);
+		relay_control(3, 1);
+	}
+	else {
+		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(3, 0);
+		DART_SET_BIT(3, FLAG_ARM_ANGLE_READY);
+		DART_SET_BIT(3, FLAG_DART_DROPPED);
+	}
+}
+
+void setKey3()
+{
+	dm_target_angle = ROTATE_4_CHANGE_DARTS_ANGLE; // 设置目标角度为第四发位置
+	if(fabs(rotateChageDarts->measure.position - dm_target_angle) > 0.1f) 
+	{
+		key3_start_tick = 0;
+		return;
+	}
+
+	if (key3_start_tick == 0) {
+		key3_start_tick = HAL_GetTick();
+		if(key3_start_tick == 0) key3_start_tick = 1;
+	}
+
+	uint32_t dt = HAL_GetTick() - key3_start_tick;
 
 	if (dt < 1500) {
 		ServoSetAngle(gripper2_motor, GRIPPER_LAY_ANGLE);
@@ -531,42 +625,13 @@ void setKey2()
 	}
 	else if (dt < 3500) {
 		ServoSetAngle(gripper2_motor, GRIPPER_NORMAL_ANGLE);
-		relay_control(2, 0);
+		relay_control(2, 1);
 	}
 	else {
 		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
 		relay_control(2, 0);
 		DART_SET_BIT(2, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(2, FLAG_DART_DROPPED);
-	}
-}
-
-void setKey3()
-{
-	if (key3_start_tick == 0) {
-		key3_start_tick = HAL_GetTick();
-		if(key3_start_tick == 0) key3_start_tick = 1;
-	}
-
-	uint32_t dt = HAL_GetTick() - key3_start_tick;
-
-	if (dt < 1500) {
-		ServoSetAngle(gripper3_motor, GRIPPER_LAY_ANGLE);
-		relay_control(3, 1);
-	}
-	else if (dt < 2000) {
-		ServoSetAngle(gripper3_motor, GRIPPER_LAY_ANGLE);
-		relay_control(3, 0);
-	}
-	else if (dt < 3500) {
-		ServoSetAngle(gripper3_motor, GRIPPER_NORMAL_ANGLE);
-		relay_control(3, 1);
-	}
-	else {
-		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
-		relay_control(3, 1);
-		DART_SET_BIT(3, FLAG_ARM_ANGLE_READY);
-		DART_SET_BIT(3, FLAG_DART_DROPPED);
 	}
 }
 
@@ -578,172 +643,12 @@ void ShootTask()
 {
 	// 从cmd获取控制数据
 	SubGetMessage(shoot_sub, &shoot_cmd_recv);
-	// DMMotorSetRef(rotateChageDarts, 3.14,0);
-	// 初始化丝杆角度
-	// if (read_2006_angle == 1)
-	// {
-	// 	loader_origin_angle = chargeLoader->measure.total_angle;
-	// 	read_2006_angle = 0;
-	// }
-	// 对shoot mode等于SHOOT_STOP的情况特殊处理,直接停止所有电机(紧急停止)
-	// if (shoot_cmd_recv.shoot_mode == SHOOT_OFF)
-	// {
-	//     ServoSetAngle(banji_motor,BANJI_CLOSE_ANGLE);
-	//     DJIMotorStop(chargeLoader);
-	//     DMMotorStop(rotateChageDarts);
-	// }
-	// else // 恢复运行
-	// {
-	//     // 扳机的控制
-	//     switch(shoot_cmd_recv.banji_mode)
-	//     {
-	//         case BANJI_OFF:
-	//             ServoSetAngle(banji_motor,BANJI_CLOSE_ANGLE);
-	//             break;
-	//         case BANJI_ON:
-	//             ServoSetAngle(banji_motor,BANJI_OPEN_ANGLE);
-	//             break;
-	//         case BANJI_AUTO:
-	//             if(flag_arm_sucess == 0 || flag_3508_ready == 0 ||
-	//             !flag_3508_max)
-	//             {
-	//                 ServoSetAngle(banji_motor,0.070);
-	//             }
-	//             // 2006到达目标位置，并且3508归位，并且机械臂执行完毕就发射
-	//             else if(flag_2006_target_ready == true)
-	//             {
-	//                 // 3508归位 并且 机械臂完成放镖 镖体成功装载
-	//                 // allow==1时允许发射
-	//                 if( flag_3508_back == 1 && flag_arm_sucess == 1 &&
-	//                 flag_wait_dart_load_delay == 1 && flag==1)
-	//                 {
-	//                     ServoSetAngle(banji_motor, 0.078);
-	//                     DWT_Delay(2);
-	//                     {
-	//                         flag_arm_sucess = 0;
-	//                         flag_wait_dart_load_delay = 0;
-	//                         flag_3508_ready = 0;
-	//                         flag_3508_back = 0;
-	//                         flag_3508_max=0;
-	//                         reload_auto=1;
-	//                         // flag_loadok = 0;
-	//                         flag_2006_target_ready = false;
-	//                         flag_2006_back = false;
-	//                         if(key==1){
-	//                             goal = ANGLE_LOAD;
-	//                         }
-	//                     }
-	//                 }
-	//                 else
-	//                     ServoSetAngle(banji_motor,0.063);
-	//             }
-	//             break;
-	//         default:
-	//             break;
-	//     }
-	// }
-	// if(f==0){
-	//     init_angle();
-	// }
-	// switch (shoot_cmd_recv.load_mode)
-	// {
-	//     case LOAD_STOP:
-	//         DJIMotorOuterLoop(chargeLoader, SPEED_LOOP); // 切换到速度环
-	//         DJIMotorSetRef(chargeLoader, 0);             //
-	//         同时设定参考值为0,这样停止的速度最快 break;
-	//     // 自动装载模式
-	//     case AUTO_LOAD:
-	//         DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
-	//         // 根据传过来的goal参数实现切换
-	//         switch(goal)
-	//         {
-	//             // 打击十六米目标
-	//             case ANGLE_16M:
-	//                 if(flag_arm_sucess == 1 && flag_3508_ready == 1){
-	//                     rate = 20000;
-	//                     loader_err = chargeLoader->measure.total_angle -
-	//                     loader_origin_angle - TOTAL_ANGLE_16M; if (loader_err
-	//                     <= -DEAD_LINE_LOAD)
-	//                     {
-	//                         DJIMotorSetRef(chargeLoader, rate);
-	//                     }
-	//                     else if(loader_err >= DEAD_LINE_LOAD)
-	//                     {
-	//                         DJIMotorSetRef(chargeLoader, -rate);
-	//                     }
-	//                     else
-	//                     {
-	//                         DJIMotorSetRef(chargeLoader, 0);
-	//                         if(flag_3508_max){
-	//                             flag_2006_target_ready = true;
-	//                         }
-	//                     }
-	//                 }
-	//                 else{
-	//                     DJIMotorSetRef(chargeLoader, 0);
-	//                 }
-	//                 break;
-	//             // 打击二十米目标，等待测量
-	//             case ANGLE_25M:
-	//                 if(flag_arm_sucess == 1 && flag_3508_ready == 1){
-	//                     rate = 20000;
-	//                     loader_err = chargeLoader->measure.total_angle -
-	//                     loader_origin_angle - TOTAL_ANGLE_25M; if (loader_err
-	//                     <= -DEAD_LINE_LOAD)
-	//                     {
-	//                         DJIMotorSetRef(chargeLoader, rate);
-	//                     }
-	//                     else if(loader_err >= DEAD_LINE_LOAD)
-	//                     {
-	//                         DJIMotorSetRef(chargeLoader, -rate);
-	//                     }
-	//                     else
-	//                     {
-	//                         DJIMotorSetRef(chargeLoader, 0);
-	//                         if(flag_3508_max){
-	//                             flag_2006_target_ready = true;
-	//                         }
-	//                     }
-	//                 }
-	//                 else{
-	//                     DJIMotorSetRef(chargeLoader, 0);
-	//                 }
-	//                 break;
-	//             // 装载角度模式，此处设置为初始化时的角度
-	//             case ANGLE_LOAD:
-	//                 rate = 20000;
-	//                 if ((chargeLoader->measure.total_angle -
-	//                 loader_origin_angle)<= -DEAD_LINE_LOAD)
-	//                 {
-	//                     DJIMotorSetRef(chargeLoader, rate);
-	//                 }
-	//                 else if((chargeLoader->measure.total_angle -
-	//                 loader_origin_angle)>= DEAD_LINE_LOAD)
-	//                 {
-	//                     DJIMotorSetRef(chargeLoader, -rate);
-	//                 }
-	//                 else
-	//                 {
-	//                     flag_2006_back = true;
-	//                 }
-	//                 break;
-	//             default:
-	//                 break;
-	//         }
-	//         break;
-	//     case LOADER_TEST:
-	//         DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
-	//         DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
-	//         break;
-	//     default:
-	//         break;
-	// }
 	if(!initServoMagnet){
 		servo_magnet_init(&initServoMagnet);
 	}
 	// BanjiServoStepTest(); // 调用舵机阶梯测试函数
 	// ServoStepTest(gripper1_motor);
-	
+	rotateSlowMove();
 	switch (shoot_cmd_recv.shoot_mode)
 	{
 	case SHOOT_OFF:
@@ -776,6 +681,7 @@ void ShootTask()
 		case LOADER_TEST:
 			DJIMotorEnable(chargeLoader);
 			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
+			//-168058
 			// DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
 			DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
 			break;
@@ -791,8 +697,8 @@ void ShootTask()
 			DMMotorStop(rotateChageDarts);
 			break;
 		case ROTATE_TEST:
-			float tff = calculateTff();
-			DMMotorSetRef(rotateChageDarts, shoot_cmd_recv.rotate_rate, 0);
+			dm_target_angle = shoot_cmd_recv.rotate_rate;
+			// DMMotorSetRef(rotateChageDarts, shoot_cmd_recv.rotate_rate, calculateTff());
 			break;
 		case ROTATE_AUTO:
 			/* code */
@@ -800,6 +706,7 @@ void ShootTask()
 		default:
 			break;
 		}
+		// rotateSlowMove();
 		switch (shoot_cmd_recv.GripperTest)
 		{
 			case 1:
@@ -820,11 +727,10 @@ void ShootTask()
 		{
 			DJIMotorEnable(chargeLoader);
 			DMMotorEnable(rotateChageDarts);
+			rotateSlowMove();
 			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
 			uint8_t cur = DartSys.currentStep; 
-			// 防止数组越界
 			if (cur >= 4) return;
-			rotateSlowMove(); // 旋转换弹电机慢速运行函数
 			if (cur == 0) {
 				DART_SET_BIT(0, FLAG_DART_DROPPED); 
 				if (!DART_CHECK_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS)) {

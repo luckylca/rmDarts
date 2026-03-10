@@ -84,5 +84,5 @@ void DMMotorControlInit();
 
 float degree_to_radian_dm(float *angle);
 float radian_to_degree_dm(float *angle);
-
+void DMMotorSetKp(DMMotorInstance *motor, float kp);
 #endif // !DMMOTOR

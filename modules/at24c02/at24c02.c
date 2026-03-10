@@ -195,7 +195,7 @@ void motorRecoderRegister(Motor_Recoder_Init_Config_s *config)
 #define RECODE_PERIOD_MS   100   // 该函数的调用周期 (必须与 osDelay 一致)
 #define IDLE_TIMEOUT_MS    2000  // 静止多久才保存 (2秒)
 #define MIN_SAVE_DIFF      5.0f  // 只有变化超过5度才写 EEPROM
-#define IDLE_CHECK_DIFF    0.5f  // 判定是否静止的抖动阈值
+#define IDLE_CHECK_DIFF    1.0f  // 判定是否静止的抖动阈值
 void RecodeAngleTask(void)
 {
     // 使用 static 保持跨函数调用的状态

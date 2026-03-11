@@ -65,7 +65,7 @@ extern int flag_3508_max;
 #define dartNoExistWeight 0
 #define dartExistLength 0
 #define dartNoExistLength 0
-#define DM_STEP_VAL 0.0026f // 30度/s 在 200Hz 更新频率下
+#define DM_STEP_VAL 0.00785f // 90度/s 在 200Hz 更新频率下 (90度≈1.57弧度，1.57÷200=0.00785)
 #define ROTATE_POWERON_SOFTSTART_MS 700U
 #define ROTATE_POWERON_KP_MIN_RATIO 0.0f
 #define ROTATE_POWERON_KD_MIN_RATIO 0.0f
@@ -74,40 +74,8 @@ float dm_current_setpoint = ROTATE_1_CHANGE_DARTS_ANGLE; // 当前发送给电�
 static uint8_t rotate_poweron_softstart_done = 0;
 static uint32_t rotate_poweron_softstart_tick = 0;
 static float rotate_angle_kp_nominal = 30.0f;
-static float rotate_angle_kd_nominal = 1.0f;
+static float rotate_angle_kd_nominal = 0.5f;
 
-static float linearRamp(float min_val, float max_val, float progress)
-{
-	if (progress < 0.0f)
-		progress = 0.0f;
-	else if (progress > 1.0f)
-		progress = 1.0f;
-	return min_val + (max_val - min_val) * progress;
-}
-
-static bool updateRotatePowerOnSoftStart(void)
-{
-	if (rotate_poweron_softstart_done) {
-		return false;
-	}
-
-	uint32_t dt = HAL_GetTick() - rotate_poweron_softstart_tick;
-	float progress = (dt >= ROTATE_POWERON_SOFTSTART_MS) ? 1.0f : ((float)dt / (float)ROTATE_POWERON_SOFTSTART_MS);
-	float kp_now = linearRamp(rotate_angle_kp_nominal * ROTATE_POWERON_KP_MIN_RATIO, rotate_angle_kp_nominal, progress);
-	float kd_now = linearRamp(rotate_angle_kd_nominal * ROTATE_POWERON_KD_MIN_RATIO, rotate_angle_kd_nominal, progress);
-	DMMotorSetKp(rotateChageDarts, kp_now);
-	rotateChageDarts->angle_PID.Kd = kd_now;
-
-	// 上电抑振阶段：先锁定当前位置，避免电机被旧参考值/大偏差直接拉扯
-	dm_current_setpoint = rotateChageDarts->measure.position;
-	dm_target_angle = dm_current_setpoint;
-	DMMotorSetRef(rotateChageDarts, dm_current_setpoint, 0.0f);
-
-	if (dt >= ROTATE_POWERON_SOFTSTART_MS) {
-		rotate_poweron_softstart_done = 1;
-	}
-	return !rotate_poweron_softstart_done;
-}
 // 计算力矩前馈
 // static float calculateTff()
 // {
@@ -228,7 +196,6 @@ static void rotateSlowMove(void)
             dm_current_setpoint -= DM_STEP_VAL;
         }
     } else {
-        // 误差很小，直接等于目标值
         dm_current_setpoint = dm_target_angle;
     }
     DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff()); 
@@ -316,8 +283,7 @@ void servo_magnet_init(int *initFlag)
 	if(isGripper1Init&&isGripper2Init&&isGripper3Init)
 	{
 		*initFlag = 1;
-		// DMMotorSetKp(rotateChageDarts, 30.0f); // 达妙电机设置一个初始Kp值，后续可以根据需要调整
-	}
+    }
 }
 
 void ShootInit()
@@ -439,9 +405,8 @@ void ShootInit()
 			{
 				.angle_PID =
 					{
-						// .Kp = 30,
-						.Kp = 30,
-						.Kd = 1.0,
+						.Kp = 1,
+						.Kd = 10.0,
 						.Ki = 0,
 						.Improve = PID_Integral_Limit |
 								   PID_ChangingIntegrationRate |
@@ -636,7 +601,7 @@ void setKey3()
 }
 
 int initServoMagnet = 0;
-
+int initRotate = 0;
 
 /* 机器人发射机构控制核心任务 */
 void ShootTask()
@@ -646,6 +611,20 @@ void ShootTask()
 	if(!initServoMagnet){
 		servo_magnet_init(&initServoMagnet);
 	}
+	// if(!initServoMagnet){
+	// 	servo_magnet_init(&initServoMagnet);
+	// }
+	
+	if(!initRotate){
+		// 阈值放宽至 0.25f，以包容你看到的 0.14 左右的稳态误差
+		if (fabs(rotateChageDarts->measure.position) < 0.20f) {
+			// 一旦到达靠近 0 的稳态区间，立刻上大刚度锁死
+			DMMotorSetKp(rotateChageDarts, rotate_angle_kp_nominal); 
+			DMMotorSetKd(rotateChageDarts, rotate_angle_kd_nominal);
+			initRotate = 1;
+		}
+	}
+
 	// BanjiServoStepTest(); // 调用舵机阶梯测试函数
 	// ServoStepTest(gripper1_motor);
 	rotateSlowMove();

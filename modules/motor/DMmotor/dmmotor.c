@@ -120,7 +120,10 @@ void DMMotorSetKp(DMMotorInstance *motor, float kp)
 {
     motor->angle_PID.Kp = kp;
 }
-
+void DMMotorSetKd(DMMotorInstance *motor, float kd)
+{
+    motor->angle_PID.Kd = kd;
+}
 void DMMotorEnable(DMMotorInstance *motor)
 {
     motor->stop_flag = MOTOR_ENALBED;

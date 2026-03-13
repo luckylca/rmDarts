@@ -102,7 +102,7 @@ void GimbalTask()
     case GIMBAL_TEST:
         DJIMotorEnable(yaw_motor);
         DJIMotorOuterLoop(yaw_motor, ANGLE_LOOP);
-        DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw); // 这里大概率还需要调节系数
+        DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw); 
         break;
     case AUTO_DART:
         /*

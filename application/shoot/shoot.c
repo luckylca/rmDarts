@@ -427,6 +427,11 @@ void ShootInit()
 		.motor_type = G6220 // 达妙电机类型
 	};
 	rotateChageDarts = DMMotorInit(&dm_motor_config, DM_MIT_MODE);
+	Motor_Recoder_Init_Config_s recoder_init_config = {
+		.type = DJI_MOTOR,
+		.data.dji = chargeLoader,
+	};
+	motorRecoderRegister(&recoder_init_config);
 	shoot_pub = PubRegister("shoot_feed", sizeof(Shoot_Upload_Data_s));
 	shoot_sub = SubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
 }

@@ -115,7 +115,7 @@ void ChassisInit()
                 .MaxOut = 20000,
             },//角度环 pid 还需要再调
             .speed_PID = {
-                .Kp = 1.5, // 4.5
+                .Kp = 4.5, // 4.5
                 .Ki = 0,  // 0
                 .Kd = 0.0001,  // 0
                 .IntegralLimit = 3000,
@@ -256,6 +256,8 @@ void ChassisTask()
             DJIMotorSetRef(motor_rf, 0);
             break;
         case CHASSIS_TEST: 
+            DJIMotorEnable(motor_lf);
+            DJIMotorEnable(motor_rf);
             // DJIMotorOuterLoop(motor_lf, ANGLE_LOOP);
             // DJIMotorOuterLoop(motor_rf, ANGLE_LOOP);
             DJIMotorOuterLoop(motor_lf, SPEED_LOOP);

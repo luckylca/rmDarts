@@ -76,6 +76,23 @@ static uint32_t rotate_poweron_softstart_tick = 0;
 static float rotate_angle_kp_nominal = 20.0f;
 static float rotate_angle_kd_nominal = 1.0f;
 
+typedef enum {
+	RELOAD_IDLE = 0,
+	RELOAD_WAIT_TRIGGER_POS,
+	RELOAD_RUN_KEY,
+	RELOAD_WAIT_TRIGGER_BACK,
+} ReloadState_e;
+
+static ReloadState_e reload_state = RELOAD_IDLE;
+static uint8_t reload_key = 0;
+static int last_gripper_cmd = 0;
+static uint8_t hold_rotate_after_reload = 0;
+static uint8_t hold_loader_after_reload = 0;
+
+#define RELOAD_TRIGGER_POS 0.0f
+#define RELOAD_TRIGGER_BACK_POS -300000.0f
+#define RELOAD_TRIGGER_DEADBAND 100.0f
+
 // 计算力矩前馈
 // static float calculateTff()
 // {
@@ -178,6 +195,14 @@ static float calculateTff()
 }
 static void rotateSlowMove(void)
 {
+	if (reload_state == RELOAD_WAIT_TRIGGER_POS || reload_state == RELOAD_WAIT_TRIGGER_BACK)
+	{
+		dm_target_angle = rotateChageDarts->measure.position;
+		dm_current_setpoint = rotateChageDarts->measure.position;
+		DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff());
+		return;
+	}
+
     // 如果电机未使能（例如在 SHOOT_OFF 模式），持续同步设定值到当前位置
     // 这样当进入 SHOOT_AUTO 时，起点就是当前位置，而不是 0
     if (rotateChageDarts->stop_flag == MOTOR_STOP) {
@@ -378,7 +403,7 @@ void ShootInit()
 				.outer_loop_type = SPEED_LOOP,
 				.close_loop_type = CURRENT_LOOP | SPEED_LOOP | ANGLE_LOOP,
 				.motor_reverse_flag =
-					MOTOR_DIRECTION_REVERSE,
+					MOTOR_DIRECTION_NORMAL,
 											// MOTOR_DIRECTION_NORMAL
 											// MOTOR_DIRECTION_REVERSE
 			},
@@ -482,6 +507,66 @@ static uint32_t magnet3_wait_tick = 0;
 static uint32_t key1_start_tick = 0;
 static uint32_t key2_start_tick = 0;
 static uint32_t key3_start_tick = 0;
+
+static void setKey1(void);
+static void setKey2(void);
+static void setKey3(void);
+
+static void clearKeyDoneFlag(uint8_t key)
+{
+	if (key == 1)
+	{
+		DART_CLEAR_BIT(1, FLAG_ARM_ANGLE_READY | FLAG_DART_DROPPED);
+	}
+	else if (key == 2)
+	{
+		DART_CLEAR_BIT(2, FLAG_ARM_ANGLE_READY | FLAG_DART_DROPPED);
+	}
+	else if (key == 3)
+	{
+		DART_CLEAR_BIT(3, FLAG_ARM_ANGLE_READY | FLAG_DART_DROPPED);
+	}
+}
+
+static uint8_t isKeyDone(uint8_t key)
+{
+	if (key == 1)
+	{
+		return DART_CHECK_BIT(1, FLAG_ARM_ANGLE_READY) && DART_CHECK_BIT(1, FLAG_DART_DROPPED);
+	}
+	if (key == 2)
+	{
+		return DART_CHECK_BIT(2, FLAG_ARM_ANGLE_READY) && DART_CHECK_BIT(2, FLAG_DART_DROPPED);
+	}
+	if (key == 3)
+	{
+		return DART_CHECK_BIT(3, FLAG_ARM_ANGLE_READY) && DART_CHECK_BIT(3, FLAG_DART_DROPPED);
+	}
+	return 0;
+}
+
+static void runKey(uint8_t key)
+{
+	if (key == 1)
+	{
+		setKey1();
+	}
+	else if (key == 2)
+	{
+		setKey2();
+	}
+	else if (key == 3)
+	{
+		setKey3();
+	}
+}
+
+static void resetKeyTicks(void)
+{
+	key1_start_tick = 0;
+	key2_start_tick = 0;
+	key3_start_tick = 0;
+}
 
 void setKey1()
 {
@@ -626,10 +711,67 @@ void ShootTask()
 		ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
 		DJIMotorStop(chargeLoader); 
 		DMMotorStop(rotateChageDarts);
+		hold_rotate_after_reload = 0;
+		hold_loader_after_reload = 0;
 		break;
 	case SHOOT_TEST:
 		DJIMotorEnable(chargeLoader);
 		DMMotorEnable(rotateChageDarts);
+		{
+			int cmd = shoot_cmd_recv.GripperTest;
+			if (cmd != last_gripper_cmd)
+			{
+				if (cmd >= 1 && cmd <= 3 && reload_state == RELOAD_IDLE)
+				{
+					reload_key = (uint8_t)cmd;
+					resetKeyTicks();
+					clearKeyDoneFlag(reload_key);
+					reload_state = RELOAD_WAIT_TRIGGER_POS;
+					hold_rotate_after_reload = 0;
+					hold_loader_after_reload = 0;
+				}
+				last_gripper_cmd = cmd;
+			}
+
+			if (reload_state != RELOAD_IDLE)
+			{
+				DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
+				switch (reload_state)
+				{
+				case RELOAD_WAIT_TRIGGER_POS:
+					DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_POS);
+					if (CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_POS, RELOAD_TRIGGER_DEADBAND))
+					{
+						reload_state = RELOAD_RUN_KEY;
+					}
+					break;
+				case RELOAD_RUN_KEY:
+					runKey(reload_key);
+					if (isKeyDone(reload_key))
+					{
+						reload_state = RELOAD_WAIT_TRIGGER_BACK;
+					}
+					break;
+				case RELOAD_WAIT_TRIGGER_BACK:
+					DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_BACK_POS);
+					if (CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_BACK_POS, RELOAD_TRIGGER_DEADBAND))
+					{
+						reload_state = RELOAD_IDLE;
+						reload_key = 0;
+						hold_rotate_after_reload = 1;
+						hold_loader_after_reload = 1;
+						dm_target_angle = rotateChageDarts->measure.position;
+						dm_current_setpoint = rotateChageDarts->measure.position;
+					}
+					break;
+				default:
+					reload_state = RELOAD_IDLE;
+					reload_key = 0;
+					break;
+				}
+				break;
+			}
+		}
 		switch (shoot_cmd_recv.banji_mode)
 		{
 		case BANJI_ON:
@@ -646,14 +788,29 @@ void ShootTask()
 		switch (shoot_cmd_recv.load_mode)
 		{
 		case LOAD_STOP:
-			DJIMotorOuterLoop(chargeLoader, SPEED_LOOP); // 切换到速度环
-			DJIMotorSetRef(chargeLoader, 0);			 // 同时设定
+			if (hold_loader_after_reload)
+			{
+				DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
+				DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_BACK_POS);
+			}
+			else
+			{
+				DJIMotorOuterLoop(chargeLoader, SPEED_LOOP); // 切换到速度环
+				DJIMotorSetRef(chargeLoader, 0);			 // 同时设定
+			}
 			break;
 		case LOADER_TEST:
 			DJIMotorEnable(chargeLoader);
 			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-			// DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
-			DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
+			if (hold_loader_after_reload)
+			{
+				DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_BACK_POS);
+			}
+			else
+			{
+				// DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
+				DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
+			}
 			break;
 		case AUTO_LOAD:
 			/* code */
@@ -667,7 +824,15 @@ void ShootTask()
 			DMMotorStop(rotateChageDarts);
 			break;
 		case ROTATE_TEST:
-			dm_target_angle = shoot_cmd_recv.rotate_rate;
+			if (hold_rotate_after_reload)
+			{
+				dm_target_angle = rotateChageDarts->measure.position;
+				dm_current_setpoint = rotateChageDarts->measure.position;
+			}
+			else
+			{
+				dm_target_angle = shoot_cmd_recv.rotate_rate;
+			}
 			// DMMotorSetRef(rotateChageDarts, shoot_cmd_recv.rotate_rate, calculateTff());
 			break;
 		case ROTATE_AUTO:
@@ -675,20 +840,6 @@ void ShootTask()
 			break;
 		default:
 			break;
-		}
-		switch (shoot_cmd_recv.GripperTest)
-		{
-			case 1:
-				setKey1();
-				break;
-			case 2:
-				setKey2();
-				break;
-			case 3:
-				setKey3();
-				break;
-			default:
-				break;
 		}
 		break;
 	case SHOOT_AUTO:

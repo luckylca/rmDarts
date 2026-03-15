@@ -51,6 +51,12 @@
 #define ROTATE_2_CHANGE_DARTS_ANGLE -1.132f // 旋转换弹第二发电机绝对位置
 #define ROTATE_3_CHANGE_DARTS_ANGLE -3.1926f // 旋转换弹第三发电机绝对位置 0。9046
 #define ROTATE_4_CHANGE_DARTS_ANGLE -5.305f // 旋转换弹第四发电机绝对位置3。00
+
+#define YELLOW_25M_SHOOT_ANGLE 500000.0f // 黄色25m发射位置
+#define GREEN_25M_SHOOT_ANGLE 535350.0f //  绿色25m发射位置
+#define BLUE_25M_SHOOT_ANGLE 535350.0f //  蓝色25m发射位置
+#define PURPLE_25M_SHOOT_ANGLE 550000.0f // 紫色25m发射位置
+
 // 检查是否出现主控板定义冲突,只允许一个开发板定义存在,否则编译会自动报错
 #if (defined(ONE_BOARD) && defined(CHASSIS_BOARD)) || \
     (defined(ONE_BOARD) && defined(GIMBAL_BOARD)) ||  \

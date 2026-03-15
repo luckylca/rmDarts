@@ -253,6 +253,11 @@ void DJIMotorChangeFeed(DJIMotorInstance *motor, Closeloop_Type_e loop, Feedback
 void DJIMotorStop(DJIMotorInstance *motor)
 {
     motor->stop_flag = MOTOR_STOP;
+    // 清零PID积分项,防止重启时积分饱和导致电机突然移动
+    motor->motor_controller.angle_PID.ITerm = 0;
+    motor->motor_controller.speed_PID.ITerm = 0;
+    motor->motor_controller.angle_PID.Err = 0;
+    motor->motor_controller.speed_PID.Err = 0;
 }
 
 void DJIMotorEnable(DJIMotorInstance *motor)

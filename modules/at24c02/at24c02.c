@@ -24,6 +24,8 @@
 #define AT24C02_READY_TIMEOUT_MS 10U
 #define AT24C02_RW_RETRY 3U
 
+static HAL_StatusTypeDef at24c02Status;
+
 static HAL_StatusTypeDef AT24C02_WaitReady(void)
 {
     return HAL_I2C_IsDeviceReady(&hi2c2, AT24C02_DEV_ADDR, AT24C02_READY_TRIALS, AT24C02_READY_TIMEOUT_MS);
@@ -162,7 +164,7 @@ void motorDataInit()
         temp_angle = 0.0f;
         // 1. 从 EEPROM 读取 4 字节并恢复为 float
         // 我们之前分配的地址是 idx * 4
-        read_status = AT24C02_ReadData(i * 4, (uint8_t *)&temp_angle, sizeof(float));
+        at24c02Status = AT24C02_ReadData(i * 4, (uint8_t *)&temp_angle, sizeof(float));
 
         if (read_status != HAL_OK) {
             temp_angle = 0.0f;
@@ -295,7 +297,8 @@ void RecodeAngleTask(void)
             fabsf(current_angle - *saved_angle_ptr) > MIN_SAVE_DIFF &&
             (now - last_save_tick[i]) >= SAVE_MIN_INTERVAL_MS)
         {
-            if (AT24C02_WriteData(i * 4, (uint8_t *)&current_angle, sizeof(float)) == HAL_OK)
+            at24c02Status = AT24C02_WriteData(i * 4, (uint8_t *)&current_angle, sizeof(float));
+            if (at24c02Status == HAL_OK)
             {
                 *saved_angle_ptr = current_angle; 
                 last_save_tick[i] = now;

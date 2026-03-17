@@ -193,7 +193,6 @@ static void RemoteControlSet()
     // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
     if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_MID) 
     {
-        i=0;
         chassis_cmd_send.chassis_mode = CHASSIS_TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_TEST;
         shoot_cmd_send.rotate_mode = ROTATE_TEST;
@@ -226,11 +225,14 @@ static void RemoteControlSet()
         if(rc_data[TEMP].none[0] == 0xc8 && rc_data[TEMP].none[1] != 0xc8 && rc_data[TEMP].none[1] != 0x708)
             shoot_cmd_send.shoot_data = YELLOW_25M_SHOOT_ANGLE;
         else if(rc_data[TEMP].none[0] == 0x708 && rc_data[TEMP].none[1] != 0xc8 && rc_data[TEMP].none[1] != 0x708)
-            shoot_cmd_send.shoot_data = GREEN_25M_SHOOT_ANGLE;
+            // shoot_cmd_send.shoot_data = GREEN_25M_SHOOT_ANGLE;
+            shoot_cmd_send.GripperTest=1;
         else if(rc_data[TEMP].none[1] == 0xc8 && rc_data[TEMP].none[0] != 0xc8 && rc_data[TEMP].none[0] != 0x708)
-            shoot_cmd_send.shoot_data = BLUE_25M_SHOOT_ANGLE;
+            // shoot_cmd_send.shoot_data = BLUE_25M_SHOOT_ANGLE;
+            shoot_cmd_send.GripperTest=2;
         else if(rc_data[TEMP].none[1] == 0x708 && rc_data[TEMP].none[0] != 0xc8 && rc_data[TEMP].none[0] != 0x708)
-            shoot_cmd_send.shoot_data = PURPLE_25M_SHOOT_ANGLE;
+            // shoot_cmd_send.shoot_data = PURPLE_25M_SHOOT_ANGLE;
+            shoot_cmd_send.GripperTest=3;
         
         #ifdef VIRSION
         gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;
@@ -238,7 +240,6 @@ static void RemoteControlSet()
     }
     else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_DOWN) // 
     {
-        i=0;
         chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
         gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
@@ -247,7 +248,6 @@ static void RemoteControlSet()
     }
     else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_UP)
     {
-        i = 1;
         chassis_cmd_send.chassis_mode = CHASSIS_TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_TEST;
         shoot_cmd_send.rotate_mode = ROTATE_TEST;
@@ -264,30 +264,15 @@ static void RemoteControlSet()
     //下面是对每个模式的细化设置，就是在 TEST 模式下的对某个模块做其他测试
     if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_MID) // 
     {   
-        if(i==1){
-            shoot_cmd_send.GripperTest=2;
-        }
-        else if(i==0){
-            shoot_cmd_send.banji_mode = BANJI_ON;
-        }
+        shoot_cmd_send.banji_mode = BANJI_ON;
     }
     else if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_DOWN)// || vision_recv_data->target_state == NO_TARGET
     {
-        if(i==1){
-            shoot_cmd_send.GripperTest=1;
-        }
-        else if(i==0){
-            shoot_cmd_send.banji_mode = BANJI_OFF;
-        }
+        shoot_cmd_send.banji_mode = BANJI_OFF;
     }
     else if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_UP) // 左 侧开关状态[上],
     {
-        if(i==1){
-            shoot_cmd_send.GripperTest=3;
-        }
-        else if(i==0){
-            shoot_cmd_send.banji_mode = BANJI_OFF;
-        }
+        shoot_cmd_send.banji_mode = BANJI_OFF;
     }                        
     #endif
 

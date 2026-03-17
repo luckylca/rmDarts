@@ -89,8 +89,8 @@ static int last_gripper_cmd = 0;
 static uint8_t hold_rotate_after_reload = 0;
 static uint8_t hold_loader_after_reload = 0;
 
-#define RELOAD_TRIGGER_POS 0.0f
-#define RELOAD_TRIGGER_BACK_POS -300000.0f
+#define RELOAD_TRIGGER_POS 5000.0f
+#define RELOAD_TRIGGER_BACK_POS 100000.0f
 #define RELOAD_TRIGGER_DEADBAND 100.0f
 
 // 计算力矩前馈
@@ -195,13 +195,13 @@ static float calculateTff()
 }
 static void rotateSlowMove(void)
 {
-	if (reload_state == RELOAD_WAIT_TRIGGER_POS || reload_state == RELOAD_WAIT_TRIGGER_BACK)
-	{
-		dm_target_angle = rotateChageDarts->measure.position;
-		dm_current_setpoint = rotateChageDarts->measure.position;
-		DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff());
-		return;
-	}
+	// if (reload_state == RELOAD_WAIT_TRIGGER_POS || reload_state == RELOAD_WAIT_TRIGGER_BACK)
+	// {
+	// 	dm_target_angle = rotateChageDarts->measure.position;
+	// 	dm_current_setpoint = rotateChageDarts->measure.position;
+	// 	DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff());
+	// 	return;
+	// }
 
     // 如果电机未使能（例如在 SHOOT_OFF 模式），持续同步设定值到当前位置
     // 这样当进入 SHOOT_AUTO 时，起点就是当前位置，而不是 0
@@ -430,9 +430,9 @@ void ShootInit()
 			{
 				.angle_PID =
 					{
-						.Kp = 1,
+						.Kp = 2,
 						.Kd = 10.0,
-						.Ki = 0,
+						.Ki = 0.1,
 						.Improve = PID_Integral_Limit |
 								   PID_ChangingIntegrationRate |
 								   PID_Trapezoid_Intergral,
@@ -442,7 +442,7 @@ void ShootInit()
 					{
 						.Kp = 3,
 						.Kd = 0.3,
-						.Ki = 0.1,
+						.Ki = 1.0,
 						.Improve = PID_Integral_Limit |
 								   PID_ChangingIntegrationRate |
 								   PID_Trapezoid_Intergral,
@@ -679,6 +679,33 @@ void setKey3()
 int initServoMagnet = 0;
 int initRotate = 0;
 
+float getCurrentAngel(int key){
+	if(key == 1){
+		return -1.132f;
+	}
+	else if(key == 2){
+		return -3.1926f;
+	}
+	else if(key == 3){
+		return -5.305f;
+	}
+	return 0.0f;
+}
+
+float getBackPosAngle(int key){
+	if(key == 1){
+		return GREEN_25M_SHOOT_ANGLE;
+	}
+	else if(key == 2){
+		return BLUE_25M_SHOOT_ANGLE;
+	}
+	else if(key == 3){
+		return PURPLE_25M_SHOOT_ANGLE;
+	}
+	return YELLOW_25M_SHOOT_ANGLE;
+}
+
+int cmd;
 /* 机器人发射机构控制核心任务 */
 void ShootTask()
 {
@@ -718,7 +745,7 @@ void ShootTask()
 		DJIMotorEnable(chargeLoader);
 		DMMotorEnable(rotateChageDarts);
 		{
-			int cmd = shoot_cmd_recv.GripperTest;
+			cmd = shoot_cmd_recv.GripperTest;
 			if (cmd != last_gripper_cmd)
 			{
 				if (cmd >= 1 && cmd <= 3 && reload_state == RELOAD_IDLE)
@@ -739,6 +766,7 @@ void ShootTask()
 				switch (reload_state)
 				{
 				case RELOAD_WAIT_TRIGGER_POS:
+					dm_target_angle = getCurrentAngel(cmd);
 					DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_POS);
 					if (CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_POS, RELOAD_TRIGGER_DEADBAND))
 					{
@@ -746,6 +774,7 @@ void ShootTask()
 					}
 					break;
 				case RELOAD_RUN_KEY:
+					dm_target_angle = getCurrentAngel(cmd);
 					runKey(reload_key);
 					if (isKeyDone(reload_key))
 					{
@@ -753,15 +782,14 @@ void ShootTask()
 					}
 					break;
 				case RELOAD_WAIT_TRIGGER_BACK:
-					DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_BACK_POS);
-					if (CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_BACK_POS, RELOAD_TRIGGER_DEADBAND))
+					dm_target_angle = getCurrentAngel(cmd);				
+					DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
+					if (CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, getBackPosAngle(cmd), RELOAD_TRIGGER_DEADBAND))
 					{
 						reload_state = RELOAD_IDLE;
 						reload_key = 0;
 						hold_rotate_after_reload = 1;
 						hold_loader_after_reload = 1;
-						dm_target_angle = rotateChageDarts->measure.position;
-						dm_current_setpoint = rotateChageDarts->measure.position;
 					}
 					break;
 				default:
@@ -791,7 +819,7 @@ void ShootTask()
 			if (hold_loader_after_reload)
 			{
 				DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-				DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_BACK_POS);
+				DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
 			}
 			else
 			{
@@ -802,15 +830,13 @@ void ShootTask()
 		case LOADER_TEST:
 			DJIMotorEnable(chargeLoader);
 			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-			if (hold_loader_after_reload)
-			{
-				DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_BACK_POS);
-			}
-			else
-			{
+
 				// DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
+				// DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
+			if(hold_loader_after_reload)
+				DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
+			else
 				DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
-			}
 			break;
 		case AUTO_LOAD:
 			/* code */
@@ -826,8 +852,7 @@ void ShootTask()
 		case ROTATE_TEST:
 			if (hold_rotate_after_reload)
 			{
-				dm_target_angle = rotateChageDarts->measure.position;
-				dm_current_setpoint = rotateChageDarts->measure.position;
+				dm_target_angle = getCurrentAngel(cmd);
 			}
 			else
 			{

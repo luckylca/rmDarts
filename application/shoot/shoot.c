@@ -65,7 +65,8 @@ extern int flag_3508_max;
 #define dartNoExistWeight 0
 #define dartExistLength 0
 #define dartNoExistLength 0
-#define DM_STEP_VAL 0.00785f // 90度/s 在 200Hz 更新频率下 (90度≈1.57弧度，1.57÷200=0.00785)
+#define DM_STEP_VAL 0.0157f          // 最大速度: 180度/秒
+#define DM_ACCEL_VAL 0.000157f       // 加速度: 每周期增加0.000157 rad
 #define ROTATE_POWERON_SOFTSTART_MS 700U
 #define ROTATE_POWERON_KP_MIN_RATIO 0.0f
 #define ROTATE_POWERON_KD_MIN_RATIO 0.0f
@@ -193,37 +194,60 @@ static float calculateTff()
 
     return tff_temp;
 }
+static float rotate_current_speed = 0; // 当前速度
+static uint8_t rotate_ramp_done = 0;   // 加速阶段完成标志
+
 static void rotateSlowMove(void)
 {
-	// if (reload_state == RELOAD_WAIT_TRIGGER_POS || reload_state == RELOAD_WAIT_TRIGGER_BACK)
-	// {
-	// 	dm_target_angle = rotateChageDarts->measure.position;
-	// 	dm_current_setpoint = rotateChageDarts->measure.position;
-	// 	DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff());
-	// 	return;
-	// }
+	// 如果电机未使能（例如在 SHOOT_OFF 模式），持续同步设定值到当前位置
+	// 这样当进入 SHOOT_AUTO 时，起点就是当前位置，而不是 0
+	if (rotateChageDarts->stop_flag == MOTOR_STOP) {
+		dm_current_setpoint = rotateChageDarts->measure.position;
+		rotate_current_speed = 0;
+		rotate_ramp_done = 0;
+		return;
+	}
 
-    // 如果电机未使能（例如在 SHOOT_OFF 模式），持续同步设定值到当前位置
-    // 这样当进入 SHOOT_AUTO 时，起点就是当前位置，而不是 0
-    if (rotateChageDarts->stop_flag == MOTOR_STOP) {
-        dm_current_setpoint = rotateChageDarts->measure.position;
-        return; 
-    }
+	// 1. 计算目标与当前的差值
+	float diff = dm_target_angle - dm_current_setpoint;
+	float abs_diff = fabs(diff);
 
-    // 1. 线性插值计算 (Ramp)
-    float diff = dm_target_angle - dm_current_setpoint;
+	// 2. 梯形速度控制
+	if (!rotate_ramp_done) {
+		// 加速阶段
+		rotate_current_speed += DM_ACCEL_VAL;
+		if (rotate_current_speed >= DM_STEP_VAL) {
+			rotate_current_speed = DM_STEP_VAL;
+			rotate_ramp_done = 1;
+		}
+	}
 
-    // 如果误差大于步长，就走一步
-    if (fabs(diff) > DM_STEP_VAL) {
-        if (diff > 0) {
-            dm_current_setpoint += DM_STEP_VAL;
-        } else {
-            dm_current_setpoint -= DM_STEP_VAL;
-        }
-    } else {
-        dm_current_setpoint = dm_target_angle;
-    }
-    DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff()); 
+	// 3. 减速阶段判断 - 当剩余距离小于减速距离时开始减速
+	// 减速距离 ≈ v²/(2a)，简化处理使用固定比例
+	float deceleration_threshold = rotate_current_speed * rotate_current_speed / (2.0f * DM_ACCEL_VAL * 10.0f);
+	if (abs_diff < deceleration_threshold && rotate_ramp_done) {
+		// 进入减速阶段
+		rotate_current_speed -= DM_ACCEL_VAL;
+		if (rotate_current_speed < DM_ACCEL_VAL * 2.0f) {
+			rotate_current_speed = DM_ACCEL_VAL * 2.0f; // 保持最小速度
+		}
+	}
+
+	// 4. 根据当前速度和方向移动
+	if (abs_diff > rotate_current_speed) {
+		if (diff > 0) {
+			dm_current_setpoint += rotate_current_speed;
+		} else {
+			dm_current_setpoint -= rotate_current_speed;
+		}
+	} else {
+		// 到达目标
+		dm_current_setpoint = dm_target_angle;
+		rotate_current_speed = 0;
+		rotate_ramp_done = 0;
+	}
+
+	DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff());
 }
 
 

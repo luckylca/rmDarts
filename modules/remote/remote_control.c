@@ -14,7 +14,7 @@ static uint8_t rc_init_flag = 0; // 遥控器初始化标志位
 
 int16_t rc_cyy[6]; // 遥控器数据   
 // 拉力传感器数据
-static double F_data[2] = {0}; // 改为数组
+static double F_data[1] = {0}; // 改为数组
 static uint8_t F_init_cnt = 0; // 记录初始化次数
 
 // 遥控器拥有的串口实例,因为遥控器是单例,所以这里只有一个,就不封装了

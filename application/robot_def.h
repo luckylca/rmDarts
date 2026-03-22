@@ -48,14 +48,19 @@
 #define CHASSIS_3508_LOAD_ANGLE 41000.0f // 3508蓄力到位角度
 #define CHASSIS_3508_REBOUND_ANGLE 6100.0f // 3508反弹到位角度
 #define ROTATE_1_CHANGE_DARTS_ANGLE 0.0f    // 旋转换弹第一发电机绝对位置,也就是初始值
-#define ROTATE_2_CHANGE_DARTS_ANGLE -1.132f // 旋转换弹第二发电机绝对位置
-#define ROTATE_3_CHANGE_DARTS_ANGLE -3.1926f // 旋转换弹第三发电机绝对位置 0。9046
+#define ROTATE_2_CHANGE_DARTS_ANGLE -1.129f // 旋转换弹第二发电机绝对位置
+#define ROTATE_3_CHANGE_DARTS_ANGLE -3.1855 // 旋转换弹第三发电机绝对位置 0。9046
 #define ROTATE_4_CHANGE_DARTS_ANGLE -5.305f // 旋转换弹第四发电机绝对位置3。00
 
-#define YELLOW_25M_SHOOT_ANGLE 150000.0f // 黄色25m发射位置
-#define GREEN_25M_SHOOT_ANGLE 110000.0f //  绿色25m发射位置
-#define BLUE_25M_SHOOT_ANGLE 120000.0f //  蓝色25m发射位置
-#define PURPLE_25M_SHOOT_ANGLE 130000.0f // 紫色25m发射位置
+#define YELLOW_25M_SHOOT_ANGLE 275945.8f // 黄色25m发射位置
+#define GREEN_25M_SHOOT_ANGLE 337313.8f //  绿色25m发射位置
+#define BLUE_25M_SHOOT_ANGLE 341342.7f //  蓝色25m发射位置
+#define PURPLE_25M_SHOOT_ANGLE 303542.7f // 紫色25m发射位置
+
+#define YELLOW_25M_YAW_ANGLE -41317.6f // 黄色25m发射位置
+#define GREEN_25M_YAW_ANGLE 15584.0f //  绿色25m发射位置
+#define BLUE_25M_YAW_ANGLE -67444.5f //  蓝色25m发射位置
+#define PURPLE_25M_YAW_ANGLE -63924.5f // 紫色25m发射位置
 
 // 检查是否出现主控板定义冲突,只允许一个开发板定义存在,否则编译会自动报错
 #if (defined(ONE_BOARD) && defined(CHASSIS_BOARD)) || \

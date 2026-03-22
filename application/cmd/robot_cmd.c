@@ -36,8 +36,8 @@ static Publisher_t *chassis_cmd_pub;   // 底盘控制消息发布者
 static Subscriber_t *chassis_feed_sub; // 底盘反馈信息订阅者
 #endif                                 // ONE_BOARD
 UART_HandleTypeDef huart2;
-static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信息,包括控制信息和UI绘制相关
-static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息,底盘功率枪口热量与底盘运动状态等
+static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信息
+static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息
 
 static MC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
 static volatile double *F_data_1 = NULL;
@@ -139,7 +139,7 @@ void RobotCMDInit()
     rc_data = MCControlInit(&huart3);
 
     F_data_1 = F_Init(&huart1);
-    F_data_2 = F_Init(&huart6);
+    // F_data_2 = F_Init(&huart6);
     vision_recv_data = VisionInit(&huart2); // 视觉通信串口，这个不实际占用串口
     
     // readAllMotorAngle(); // 从EEPROM加载所有电机总角度数据
@@ -217,22 +217,27 @@ static void RemoteControlSet()
         // shoot_cmd_send.shoot_data = -100.0f * (float)rc_data[TEMP].rocker_l1; 
         shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
         // chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
-        chassis_cmd_send.v1 = -20.0f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
+        chassis_cmd_send.v1 = -10.0f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
         gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
         // shoot_cmd_send.rotate_rate += 30.0f * (float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
         shoot_cmd_send.rotate_rate += 0.000005f*(float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
 
         if(rc_data[TEMP].none[0] == 0xc8 && rc_data[TEMP].none[1] != 0xc8 && rc_data[TEMP].none[1] != 0x708)
-            shoot_cmd_send.shoot_data = YELLOW_25M_SHOOT_ANGLE;
+            {shoot_cmd_send.shoot_data = YELLOW_25M_SHOOT_ANGLE;
+            gimbal_cmd_send.yaw = YELLOW_25M_YAW_ANGLE;}
         else if(rc_data[TEMP].none[0] == 0x708 && rc_data[TEMP].none[1] != 0xc8 && rc_data[TEMP].none[1] != 0x708)
             // shoot_cmd_send.shoot_data = GREEN_25M_SHOOT_ANGLE;
-            shoot_cmd_send.GripperTest=1;
+            {shoot_cmd_send.GripperTest=1;
+            gimbal_cmd_send.yaw = GREEN_25M_YAW_ANGLE;}
         else if(rc_data[TEMP].none[1] == 0xc8 && rc_data[TEMP].none[0] != 0xc8 && rc_data[TEMP].none[0] != 0x708)
             // shoot_cmd_send.shoot_data = BLUE_25M_SHOOT_ANGLE;
+            {
             shoot_cmd_send.GripperTest=2;
+            gimbal_cmd_send.yaw = BLUE_25M_YAW_ANGLE;}
         else if(rc_data[TEMP].none[1] == 0x708 && rc_data[TEMP].none[0] != 0xc8 && rc_data[TEMP].none[0] != 0x708)
             // shoot_cmd_send.shoot_data = PURPLE_25M_SHOOT_ANGLE;
-            shoot_cmd_send.GripperTest=3;
+            {shoot_cmd_send.GripperTest=3;
+            gimbal_cmd_send.yaw = PURPLE_25M_YAW_ANGLE;}
         
         #ifdef VIRSION
         gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;
@@ -389,12 +394,10 @@ static void MouseKeySet()
     
 }
 
-
 static void ImageRoadSet()
 {
 
 }                                                   
-
 
 // 遥控器掉线报警
 static void RemoteControl_outline_ALARM()
@@ -405,28 +408,8 @@ static void RemoteControl_outline_ALARM()
     DWT_Delay(1);
 }
 
-
 static void EmergencyHandler()
 {   
-    // 拨轮的向下拨超过一半进入急停模式.注意向打时下拨轮是正
-    // if ((RemoteControlIsOnline()==0)|| robot_state == ROBOT_STOP) // 还需添加重要应用和模块离线的判断
-    // { 
-        
-    //     alarm_count++;
-    //     gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
-    //     chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
-    //     shoot_cmd_send.shoot_mode = SHOOT_OFF;
-    //     shoot_cmd_send.banji_mode = BANJI_OFF;
-    //     shoot_cmd_send.load_mode = LOAD_STOP;
-    //     LOGERROR("[CMD] emergency stop!");
-    // } 
-    // else 
-    // {   
-    //     alarm_count = 0;
-    //     robot_state = ROBOT_READY;
-    //     shoot_cmd_send.shoot_mode = SHOOT_ON;
-    //     LOGINFO("[CMD] reinstate, robot ready");
-    // }
     
 }
 

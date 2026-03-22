@@ -74,7 +74,7 @@ float dm_target_angle = ROTATE_1_CHANGE_DARTS_ANGLE;     // 我们希望最终�
 float dm_current_setpoint = ROTATE_1_CHANGE_DARTS_ANGLE; // 当前发送给电机的瞬时角度（插值过程量）
 static uint8_t rotate_poweron_softstart_done = 0;
 static uint32_t rotate_poweron_softstart_tick = 0;
-static float rotate_angle_kp_nominal = 20.0f;
+static float rotate_angle_kp_nominal = 40.0f;
 static float rotate_angle_kd_nominal = 1.0f;
 
 typedef enum {
@@ -90,8 +90,7 @@ static int last_gripper_cmd = 0;
 static uint8_t hold_rotate_after_reload = 0;
 static uint8_t hold_loader_after_reload = 0;
 
-#define RELOAD_TRIGGER_POS 5000.0f
-#define RELOAD_TRIGGER_BACK_POS 100000.0f
+#define RELOAD_TRIGGER_POS 400000.0f
 #define RELOAD_TRIGGER_DEADBAND 100.0f
 
 // 计算力矩前馈
@@ -595,7 +594,7 @@ static void resetKeyTicks(void)
 void setKey1()
 {
 	dm_target_angle = ROTATE_2_CHANGE_DARTS_ANGLE; // 设置目标角度为第二发位置
-	if(fabs(rotateChageDarts->measure.position - dm_target_angle) > 0.1f) // 放宽到位判断阈值
+	if(fabs(rotateChageDarts->measure.position - dm_target_angle) > 0.15f) // 放宽到位判断阈值
 	{
 		key1_start_tick = 0; // 未到位时重置时间戳
 		return;
@@ -705,13 +704,13 @@ int initRotate = 0;
 
 float getCurrentAngel(int key){
 	if(key == 1){
-		return -1.132f;
+		return ROTATE_2_CHANGE_DARTS_ANGLE;
 	}
 	else if(key == 2){
-		return -3.1926f;
+		return ROTATE_3_CHANGE_DARTS_ANGLE;
 	}
 	else if(key == 3){
-		return -5.305f;
+		return ROTATE_4_CHANGE_DARTS_ANGLE;
 	}
 	return 0.0f;
 }
@@ -854,9 +853,8 @@ void ShootTask()
 		case LOADER_TEST:
 			DJIMotorEnable(chargeLoader);
 			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-
-				// DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
-				// DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
+			// DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
+			// DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
 			if(hold_loader_after_reload)
 				DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
 			else

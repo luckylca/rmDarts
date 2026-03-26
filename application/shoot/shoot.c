@@ -90,8 +90,7 @@ static int last_gripper_cmd = 0;
 static uint8_t hold_rotate_after_reload = 0;
 static uint8_t hold_loader_after_reload = 0;
 
-#define RELOAD_TRIGGER_POS 400000.0f
-#define RELOAD_TRIGGER_DEADBAND 100.0f
+
 
 // 计算力矩前馈
 // static float calculateTff()
@@ -624,6 +623,7 @@ void setKey1()
 		relay_control(3, 0);
 		DART_SET_BIT(1, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(1, FLAG_DART_DROPPED);
+		DART_SET_BIT(1, FLAG_RELOAD_ROTATED);//先默认置位
 	}
 }
 
@@ -900,8 +900,8 @@ void ShootTask()
 			if (cur == 0) {
 				DART_SET_BIT(0, FLAG_DART_DROPPED); 
 				if (!DART_CHECK_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS)) {
-					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
-					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_SHOOT_25_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+					DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
 						DART_SET_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS);
 					}
 					return;
@@ -923,12 +923,11 @@ void ShootTask()
 			if (cur == 1) {
 				if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_LOAD_POS)) {
 					// 扳机移动到装弹位置
-					DJIMotorSetRef(chargeLoader, LOADER_LOAD_ANGLE);
-					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_LOAD_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+					DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_POS);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_POS, RELOAD_TRIGGER_DEADBAND)) {// 到达位置后设置标志位
 						DART_SET_BIT(1, FLAG_TRIGGER_AT_LOAD_POS);
 					}
 				}
-				DART_SET_BIT(1, FLAG_RELOAD_ROTATED);//先默认置位
 				if (DART_CHECK_MASK(1, MASK_READY_TO_LOAD)) {
 					setKey1(); // 关闭电磁铁，放下飞镖
 				}
@@ -937,8 +936,8 @@ void ShootTask()
 				}
 				if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置
-					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
-					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_SHOOT_25_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+					DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
 						DART_SET_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS);
 					}
 				}
@@ -959,8 +958,8 @@ void ShootTask()
 			if (cur == 2) {
 				if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_LOAD_POS)) {
 					// 扳机移动到装弹位置
-					DJIMotorSetRef(chargeLoader, LOADER_LOAD_ANGLE);
-					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_LOAD_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+					DJIMotorSetRef(chargeLoader, GREEN_25M_SHOOT_ANGLE);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, GREEN_25M_SHOOT_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
 						DART_SET_BIT(2, FLAG_TRIGGER_AT_LOAD_POS);
 					}
 				}
@@ -973,8 +972,8 @@ void ShootTask()
 				}
 				if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置
-					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
-					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_SHOOT_25_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+					DJIMotorSetRef(chargeLoader, BLUE_25M_SHOOT_ANGLE);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, BLUE_25M_SHOOT_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
 						DART_SET_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS);
 					}
 				}
@@ -995,8 +994,8 @@ void ShootTask()
 			if (cur == 3) {
 				if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_LOAD_POS)) {
 					// 扳机移动到装弹位置
-					DJIMotorSetRef(chargeLoader, LOADER_LOAD_ANGLE);
-					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_LOAD_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+					DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_POS);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_POS, RELOAD_TRIGGER_DEADBAND)) {// 到达位置后设置标志位
 						DART_SET_BIT(3, FLAG_TRIGGER_AT_LOAD_POS);
 					}
 				}
@@ -1009,8 +1008,8 @@ void ShootTask()
 				}
 				if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS)) {
 					// 扳机移动到发射位置
-					DJIMotorSetRef(chargeLoader, LOADER_SHOOT_25_ANGLE);
-					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, LOADER_SHOOT_25_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+					DJIMotorSetRef(chargeLoader, PURPLE_25M_SHOOT_ANGLE);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, PURPLE_25M_SHOOT_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
 						DART_SET_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS);
 					}
 				}

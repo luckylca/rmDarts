@@ -42,15 +42,20 @@
 #define GRIPPER_2_NORMAL_ANGLE 0.0250f // 夹爪正常角度
 #define GRIPPER_3_LAY_ANGLE 0.110f // 夹爪放置角度
 #define GRIPPER_3_NORMAL_ANGLE 0.070f // 夹爪正常角度
-#define LOADER_LOAD_ANGLE -669497.75f    // 扳机装载位置
-#define LOADER_SHOOT_25_ANGLE 0.05f  // 扳机发射基地位置
-#define LOADER_SHOOT_16_ANGLE 0.03f  // 扳机发射前哨站位置
+
 #define CHASSIS_3508_LOAD_ANGLE 41000.0f // 3508蓄力到位角度
 #define CHASSIS_3508_REBOUND_ANGLE 6100.0f // 3508反弹到位角度
+
+#define RELOAD_TRIGGER_POS 400000.0f
+#define RELOAD_TRIGGER_DEADBAND 100.0f
+
 #define ROTATE_1_CHANGE_DARTS_ANGLE 0.0f    // 旋转换弹第一发电机绝对位置,也就是初始值
 #define ROTATE_2_CHANGE_DARTS_ANGLE -1.129f // 旋转换弹第二发电机绝对位置
 #define ROTATE_3_CHANGE_DARTS_ANGLE -3.1855 // 旋转换弹第三发电机绝对位置 0。9046
 #define ROTATE_4_CHANGE_DARTS_ANGLE -5.305f // 旋转换弹第四发电机绝对位置3。00
+
+#define ENCODER_LEFT_LIMIT  0x400     // 左边encoder限位值
+#define ENCODER_RIGHT_LIMIT 0x4b2    // 右边encoder限位值
 
 #define YELLOW_25M_SHOOT_ANGLE 275945.8f // 黄色25m发射位置
 #define GREEN_25M_SHOOT_ANGLE 337313.8f //  绿色25m发射位置

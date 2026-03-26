@@ -22,6 +22,7 @@
 #include "bsp_dwt.h"
 #include "bsp_log.h"
 #include "buzzer.h"
+#include "user_lib.h"
 #include <stdbool.h>
 
 
@@ -382,6 +383,45 @@ static void RemoteControlSet()
         //自动模式
     }                                       
     #endif
+    // yaw轴限幅 - 根据encoder绝对值限幅
+    {
+        static float last_valid_yaw = 0.0f; // 上一次有效的 yaw 值
+        static uint8_t yaw_limit_init = 0;   // 初始化标志
+
+
+        // 第一次运行时，初始化 last_valid_yaw 为当前值
+        if (!yaw_limit_init) {
+            last_valid_yaw = gimbal_cmd_send.yaw;
+            yaw_limit_init = 1;
+        }
+
+        uint16_t enc_pos = encoder->measure.position;
+        float new_yaw = gimbal_cmd_send.yaw;
+
+        // 超过右限位encoder：只能往左减，不能继续往右加
+        if (enc_pos > ENCODER_RIGHT_LIMIT) {
+            if (new_yaw > last_valid_yaw) {
+                // 继续往右越界，不更新
+                gimbal_cmd_send.yaw = last_valid_yaw;
+            } else {
+                // 往回走，允许更新
+                last_valid_yaw = new_yaw;
+            }
+        }
+        // 超过左限位encoder：只能往右加，不能继续往左减
+        else if (enc_pos < ENCODER_LEFT_LIMIT) {
+            if (new_yaw < last_valid_yaw) {
+                // 继续往左越界，不更新
+                gimbal_cmd_send.yaw = last_valid_yaw;
+            } else {
+                // 往回走，允许更新
+                last_valid_yaw = new_yaw;
+            }
+        } else {
+            // 在范围内，正常更新
+            last_valid_yaw = new_yaw;
+        }
+    }
 
 }
 static void VisionControl()
@@ -410,7 +450,40 @@ static void RemoteControl_outline_ALARM()
 
 static void EmergencyHandler()
 {   
-    
+    uint8_t remote_online = 1;
+    uint16_t switch_right = RC_SW_DOWN;
+
+#ifdef MC_SBUS
+    remote_online = MCControlIsOnline();
+    switch_right = mc_data_change(rc_data[TEMP].switch_r);
+#endif
+
+#ifdef DBUS
+    remote_online = RemoteControlIsOnline();
+    switch_right = rc_data[TEMP].rc.switch_right;
+#endif
+
+    if ((!remote_online) ||
+        (switch_right != RC_SW_UP && switch_right != RC_SW_MID && switch_right != RC_SW_DOWN))
+    {
+        chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
+        chassis_cmd_send.v_ = 0.0f;
+        chassis_cmd_send.v1 = 0.0f;
+
+        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
+        gimbal_cmd_send.bottom = 0.0f;
+
+        shoot_cmd_send.shoot_mode = SHOOT_OFF;
+        shoot_cmd_send.load_mode = LOAD_STOP;
+        shoot_cmd_send.banji_mode = BANJI_OFF;
+        shoot_cmd_send.rotate_mode = ROTATE_STOP;
+        shoot_cmd_send.shoot_data = 0.0f;
+        shoot_cmd_send.rotate_rate = 0.0f;
+        shoot_cmd_send.banjiPos = 0.0f;
+        shoot_cmd_send.GripperTest = 0;
+
+        RemoteControl_outline_ALARM();
+    }
 }
 
 void RobotCMDTask()

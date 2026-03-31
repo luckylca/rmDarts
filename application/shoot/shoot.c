@@ -12,6 +12,7 @@
 #include "status.h"
 #include "at24c02.h"
 #include "cmsis_os.h"
+#include "bsp_log.h"
 
 #define DEAD_LINE_LOAD 20
 static DJIMotorInstance *chargeLoader;	  // 蓄力丝杆
@@ -29,6 +30,12 @@ static Shoot_Upload_Data_s shoot_feedback_data; // 来自cmd的发射控制信�
 
 // dwt定时,计算冷却用
 static float hibernate_time = 0, dead_time = 10;
+
+// 调试用全局变量
+float debug_motor_angle = 0;
+float debug_calc_tff = 0;
+float debug_motor_torque = 0;
+uint8_t debug_num_darts = 3;
 
 float loader_origin_angle = 0;
 float dead_angle = 2000;
@@ -115,82 +122,41 @@ static uint8_t hold_loader_after_reload = 0;
 // }
 static float calculateTff()
 {
-    // 1. 获取当前电机角度
-    float roatateAngle = radian_to_degree_dm(&rotateChageDarts->measure.position);
-    
-    // 2. 定义局部变量
-    float tff_temp = 0.0f;
-    float sin1, sin2, sin3, cosTmp;
-    
-    // 3. 计算各个夹爪的实际物理角度 (关键修正！)
-    // 根据你的描述：电机转到30度时，1号臂到达底部(垂直向下，即0度相位)
-    // 所以：Arm1_Angle = Motor_Angle - 30
-    float angle1 = roatateAngle - 30.0f;
-    float angle2 = angle1 + 120.0f;
-    float angle3 = angle1 - 120.0f; // 或者 +240.0f
+    #define K_GRAVITY 0.1343f
+    #define ZERO_POINT_DEG 118.4f
 
-    // 4. 计算三角函数
-    arm_sin_cos_f32(angle1, &sin1, &cosTmp);
-    arm_sin_cos_f32(angle2, &sin2, &cosTmp);
-    arm_sin_cos_f32(angle3, &sin3, &cosTmp);
+    float motor_angle_rad = rotateChageDarts->measure.position;
+    float motor_angle_deg = motor_angle_rad * 57.2957795f;
 
-    // 5. 确定当前三个臂的质量/力矩系数 (M * g * L)
-    // 使用变量分别代表三个臂的 "m*g*L" 系数
-    float torque_coeff_1, torque_coeff_2, torque_coeff_3;
-    
-    float val_full  = dartExistLength * dartExistWeight;   // 满载时的 m*L (注意：这里还没乘g，如果你的Weight是质量kg，最后要乘9.8)
-    float val_empty = dartNoExistLength * dartNoExistWeight; // 空载时的 m*L
+    while (motor_angle_deg > 180.0f) motor_angle_deg -= 360.0f;
+    while (motor_angle_deg < -180.0f) motor_angle_deg += 360.0f;
 
-    // 6. 状态机：根据角度判断谁掉了 (逻辑修正)
-    // 注意：这里假设你只正向旋转。如果需要往回转，逻辑一样。
-    // 增加了一点点冗余角度防止边界跳变
-    
-    if (roatateAngle < 30.0f) 
-    {
-        // --- 阶段 0: 0 ~ 30度 ---
-        // 初始状态，全满
-        torque_coeff_1 = val_full;
-        torque_coeff_2 = val_full;
-        torque_coeff_3 = val_full;
-    }
-    else if (roatateAngle < 150.0f)
-    {
-        // --- 阶段 1: 30 ~ 150度 ---
-        // 1号臂已放下 (空)，2、3号满
-        torque_coeff_1 = val_empty;
-        torque_coeff_2 = val_full;
-        torque_coeff_3 = val_full;
-    }
-    else if (roatateAngle < 270.0f)
-    {
-        // --- 阶段 2: 150 ~ 270度 ---
-        // 1号空，3号也放下了 (根据顺时针顺序，下一个到底是2还是3，取决于你的机械安装，这里假设间隔120度是3号)
-        torque_coeff_1 = val_empty;
-        torque_coeff_2 = val_full;
-        torque_coeff_3 = val_empty; 
-    }
-    else
-    {
-        // --- 阶段 3: > 270度 ---
-        // 2号也放下了，全空
-        torque_coeff_1 = val_empty;
-        torque_coeff_2 = val_empty;
-        torque_coeff_3 = val_empty;
+    float arm1_angle_deg = motor_angle_deg - ZERO_POINT_DEG;
+
+    uint8_t num_objects = debug_num_darts;
+
+    debug_motor_angle = motor_angle_deg;
+    debug_motor_torque = rotateChageDarts->measure.torque;
+
+    if (num_objects == 0 || num_objects == 3) {
+        debug_calc_tff = 0.0f;
+        return 0.0f;
     }
 
-    // 7. 计算总负载力矩 (求和！)
-    // Torque = (m1*L1*sin1) + (m2*L2*sin2) + (m3*L3*sin3)
-    // 假设你的 Weight 变量已经是 力(N) 或者 质量*g
-    // 如果 Weight 只是质量(kg)，这里需要乘以 9.8f
-    float total_load_torque = (torque_coeff_1 * sin1) + 
-                              (torque_coeff_2 * sin2) + 
-                              (torque_coeff_3 * sin3);
+    float sin_val, cos_val;
+    arm_sin_cos_f32(arm1_angle_deg, &sin_val, &cos_val);
 
-    // 8. 输出前馈
-    // 前馈是要“抵抗”负载，所以通常取反
-    tff_temp = -total_load_torque;
+    float tff;
+    if (num_objects == 2) {
+        tff = K_GRAVITY * sin_val;
+    } else {
+        float arm3_angle_deg = arm1_angle_deg - 240.0f;
+        arm_sin_cos_f32(arm3_angle_deg, &sin_val, &cos_val);
+        tff = -K_GRAVITY * sin_val;
+    }
 
-    return tff_temp;
+    debug_calc_tff = tff;
+    return tff;
 }
 static float rotate_current_speed = 0; // 当前速度
 static uint8_t rotate_ramp_done = 0;   // 加速阶段完成标志
@@ -321,7 +287,7 @@ void servo_magnet_init(int *initFlag)
 		gripper3_wait_tick = HAL_GetTick();
 
 	if (HAL_GetTick() - gripper3_wait_tick < 1500)
-		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
+		ServoSetAngle(gripper3_motor, GRIPPER_3_NORMAL_ANGLE);
 	else
 	{
 		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
@@ -606,21 +572,21 @@ void setKey1()
 
 	uint32_t dt = HAL_GetTick() - key1_start_tick;
 
-	if (dt < 1500) {
-		ServoSetAngle(gripper1_motor, GRIPPER_1_LAY_ANGLE);
-		relay_control(3, 0);
+	if (dt < 1000) {
+		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
+		relay_control(2, 0);
 	}
-	else if (dt < 2000) { // 1500 + 500
-		ServoSetAngle(gripper1_motor, GRIPPER_1_LAY_ANGLE);
-		relay_control(3, 1);
+	else if (dt < 1500) { // 1500 + 500
+		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
+		relay_control(2, 1);
 	}
 	else if (dt < 3500) { // 2000 + 1500
-		ServoSetAngle(gripper1_motor, GRIPPER_1_NORMAL_ANGLE);
-		relay_control(3, 1);
+		ServoSetAngle(gripper3_motor, GRIPPER_3_NORMAL_ANGLE);
+		relay_control(2, 1);
 	}
 	else {
-		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
-		relay_control(3, 0);
+		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(2, 0);
 		DART_SET_BIT(1, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(1, FLAG_DART_DROPPED);
 		DART_SET_BIT(1, FLAG_RELOAD_ROTATED);//先默认置位
@@ -644,20 +610,20 @@ void setKey2()
 	uint32_t dt = HAL_GetTick() - key2_start_tick;
 
 	if (dt < 1500) {
-		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
-		relay_control(2, 0);
+		ServoSetAngle(gripper2_motor, GRIPPER_2_LAY_ANGLE);
+		relay_control(3, 0);
 	}
 	else if (dt < 2000) {
-		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
-		relay_control(2, 1);
+		ServoSetAngle(gripper2_motor, GRIPPER_2_NORMAL_ANGLE);
+		relay_control(3, 1);
 	}
 	else if (dt < 3500) {
-		ServoSetAngle(gripper3_motor, GRIPPER_3_NORMAL_ANGLE);
-		relay_control(2, 1);
+		ServoSetAngle(gripper2_motor, GRIPPER_2_NORMAL_ANGLE);
+		relay_control(3, 1);
 	}
 	else {
 		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
-		relay_control(2, 0);
+		relay_control(3, 0);
 		DART_SET_BIT(2, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(2, FLAG_DART_DROPPED);
 	}
@@ -679,20 +645,20 @@ void setKey3()
 
 	uint32_t dt = HAL_GetTick() - key3_start_tick;
 
-	if (dt < 1500) {
-		ServoSetAngle(gripper2_motor, GRIPPER_2_LAY_ANGLE);
+	if (dt < 1000) {
+		ServoSetAngle(gripper1_motor, GRIPPER_1_LAY_ANGLE);
 		relay_control(1, 0);
 	}
-	else if (dt < 2000) {
-		ServoSetAngle(gripper2_motor, GRIPPER_2_LAY_ANGLE);
+	else if (dt < 1500) {
+		ServoSetAngle(gripper1_motor, GRIPPER_1_LAY_ANGLE);
 		relay_control(1, 1);
 	}
 	else if (dt < 3500) {
-		ServoSetAngle(gripper2_motor, GRIPPER_2_NORMAL_ANGLE);
+		ServoSetAngle(gripper1_motor, GRIPPER_1_NORMAL_ANGLE);
 		relay_control(1, 1);
 	}
 	else {
-		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
+		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
 		relay_control(1, 0);
 		DART_SET_BIT(3, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(3, FLAG_DART_DROPPED);
@@ -751,9 +717,13 @@ void ShootTask()
 			rotate_in_range_tick = 0;
 		}
 	}
-
+	// ServoSetAngle(gripper1_motor,1.0f);
 	// BanjiServoStepTest(); // 调用舵机阶梯测试函数
-	// ServoStepTest(gripper2_motor);
+	// ServoStepTest(gripper1_motor);
+	// relay_control(1, 1);
+	// relay_control(2, 1);
+	// relay_control(3, 1);
+
 	rotateSlowMove();
 	switch (shoot_cmd_recv.shoot_mode)
 	{
@@ -880,6 +850,7 @@ void ShootTask()
 			{
 				dm_target_angle = shoot_cmd_recv.rotate_rate;
 			}
+			//力矩正方向是面对镖架的顺时针
 			// DMMotorSetRef(rotateChageDarts, shoot_cmd_recv.rotate_rate, calculateTff());
 			break;
 		case ROTATE_AUTO:

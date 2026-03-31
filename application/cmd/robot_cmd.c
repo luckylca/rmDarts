@@ -194,6 +194,7 @@ static void RemoteControlSet()
     // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
     if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_MID) 
     {
+        int16_t rocker_r1 = rc_data[TEMP].rocker_r1;
         chassis_cmd_send.chassis_mode = CHASSIS_TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_TEST;
         shoot_cmd_send.rotate_mode = ROTATE_TEST;
@@ -203,9 +204,9 @@ static void RemoteControlSet()
         {
             rc_data[TEMP].rocker_l1=0;
         }
-        if(fabs(rc_data[TEMP].rocker_r1)<50)
+        if(fabs(rocker_r1)<50)
         {
-            rc_data[TEMP].rocker_r1=0;
+            rocker_r1=0;
         }
         if(fabs(rc_data[TEMP].rocker_r_)<50)
         {
@@ -215,30 +216,41 @@ static void RemoteControlSet()
         {
             rc_data[TEMP].rocker_l_=0;
         }
+        if(rocker_r1==-960)
+        {
+            rocker_r1=0;
+        }
         // shoot_cmd_send.shoot_data = -100.0f * (float)rc_data[TEMP].rocker_l1; 
         shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
         // chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
-        chassis_cmd_send.v1 = -10.0f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
+        chassis_cmd_send.v1 = -15.0f * (float)rocker_r1; // 1竖直方向，速度 12000
         gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
         // shoot_cmd_send.rotate_rate += 30.0f * (float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
         shoot_cmd_send.rotate_rate += 0.000005f*(float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
 
         if(rc_data[TEMP].none[0] == 0xc8 && rc_data[TEMP].none[1] != 0xc8 && rc_data[TEMP].none[1] != 0x708)
-            {shoot_cmd_send.shoot_data = YELLOW_25M_SHOOT_ANGLE;
-            gimbal_cmd_send.yaw = YELLOW_25M_YAW_ANGLE;}
+        {
+            shoot_cmd_send.shoot_data = YELLOW_25M_SHOOT_ANGLE;
+            // gimbal_cmd_send.yaw = YELLOW_25M_YAW_ANGLE;
+        }
         else if(rc_data[TEMP].none[0] == 0x708 && rc_data[TEMP].none[1] != 0xc8 && rc_data[TEMP].none[1] != 0x708)
             // shoot_cmd_send.shoot_data = GREEN_25M_SHOOT_ANGLE;
-            {shoot_cmd_send.GripperTest=1;
-            gimbal_cmd_send.yaw = GREEN_25M_YAW_ANGLE;}
+        {
+            shoot_cmd_send.GripperTest=1;
+            // gimbal_cmd_send.yaw = GREEN_25M_YAW_ANGLE;
+        }
         else if(rc_data[TEMP].none[1] == 0xc8 && rc_data[TEMP].none[0] != 0xc8 && rc_data[TEMP].none[0] != 0x708)
             // shoot_cmd_send.shoot_data = BLUE_25M_SHOOT_ANGLE;
-            {
+        {
             shoot_cmd_send.GripperTest=2;
-            gimbal_cmd_send.yaw = BLUE_25M_YAW_ANGLE;}
+            // gimbal_cmd_send.yaw = BLUE_25M_YAW_ANGLE;
+        }
         else if(rc_data[TEMP].none[1] == 0x708 && rc_data[TEMP].none[0] != 0xc8 && rc_data[TEMP].none[0] != 0x708)
             // shoot_cmd_send.shoot_data = PURPLE_25M_SHOOT_ANGLE;
-            {shoot_cmd_send.GripperTest=3;
-            gimbal_cmd_send.yaw = PURPLE_25M_YAW_ANGLE;}
+        {
+            shoot_cmd_send.GripperTest=3;
+            // gimbal_cmd_send.yaw = PURPLE_25M_YAW_ANGLE;
+        }
         
         #ifdef VIRSION
         gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;
@@ -254,17 +266,11 @@ static void RemoteControlSet()
     }
     else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_UP)
     {
-        chassis_cmd_send.chassis_mode = CHASSIS_TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
-        shoot_cmd_send.shoot_mode = SHOOT_TEST;
-        shoot_cmd_send.rotate_mode = ROTATE_TEST;
-        shoot_cmd_send.load_mode = LOADER_TEST;
-        gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
-        shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
-        // chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
-        chassis_cmd_send.v1 = -20.0f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向
-        gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
-        // shoot_cmd_send.rotate_rate += 30.0f * (float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度，参数依旧要改
-        shoot_cmd_send.rotate_rate += 0.000005f*(float)rc_data[TEMP].rocker_r_;     
+        chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
+        // shoot_cmd_send.shoot_mode = SHOOT_AUTO;
+        // shoot_cmd_send.load_mode = AUTO_LOAD;
+        // shoot_cmd_send.banji_mode = BANJI_AUTO;
+        // shoot_cmd_send.rotate_mode = ROTATE_AUTO;  
     }
 
     //下面是对每个模式的细化设置，就是在 TEST 模式下的对某个模块做其他测试
@@ -384,44 +390,44 @@ static void RemoteControlSet()
     }                                       
     #endif
     // yaw轴限幅 - 根据encoder绝对值限幅
-    {
-        static float last_valid_yaw = 0.0f; // 上一次有效的 yaw 值
-        static uint8_t yaw_limit_init = 0;   // 初始化标志
+    // {
+    //     static float last_valid_yaw = 0.0f; // 上一次有效的 yaw 值
+    //     static uint8_t yaw_limit_init = 0;   // 初始化标志
 
 
-        // 第一次运行时，初始化 last_valid_yaw 为当前值
-        if (!yaw_limit_init) {
-            last_valid_yaw = gimbal_cmd_send.yaw;
-            yaw_limit_init = 1;
-        }
+    //     // 第一次运行时，初始化 last_valid_yaw 为当前值
+    //     if (!yaw_limit_init) {
+    //         last_valid_yaw = gimbal_cmd_send.yaw;
+    //         yaw_limit_init = 1;
+    //     }
 
-        uint16_t enc_pos = encoder->measure.position;
-        float new_yaw = gimbal_cmd_send.yaw;
+    //     uint16_t enc_pos = encoder->measure.position;
+    //     float new_yaw = gimbal_cmd_send.yaw;
 
-        // 超过右限位encoder：只能往左减，不能继续往右加
-        if (enc_pos > ENCODER_RIGHT_LIMIT) {
-            if (new_yaw > last_valid_yaw) {
-                // 继续往右越界，不更新
-                gimbal_cmd_send.yaw = last_valid_yaw;
-            } else {
-                // 往回走，允许更新
-                last_valid_yaw = new_yaw;
-            }
-        }
-        // 超过左限位encoder：只能往右加，不能继续往左减
-        else if (enc_pos < ENCODER_LEFT_LIMIT) {
-            if (new_yaw < last_valid_yaw) {
-                // 继续往左越界，不更新
-                gimbal_cmd_send.yaw = last_valid_yaw;
-            } else {
-                // 往回走，允许更新
-                last_valid_yaw = new_yaw;
-            }
-        } else {
-            // 在范围内，正常更新
-            last_valid_yaw = new_yaw;
-        }
-    }
+    //     // 超过右限位encoder：只能往左减，不能继续往右加
+    //     if (enc_pos > ENCODER_RIGHT_LIMIT) {
+    //         if (new_yaw > last_valid_yaw) {
+    //             // 继续往右越界，不更新
+    //             gimbal_cmd_send.yaw = last_valid_yaw;
+    //         } else {
+    //             // 往回走，允许更新
+    //             last_valid_yaw = new_yaw;
+    //         }
+    //     }
+    //     // 超过左限位encoder：只能往右加，不能继续往左减
+    //     else if (enc_pos < ENCODER_LEFT_LIMIT) {
+    //         if (new_yaw < last_valid_yaw) {
+    //             // 继续往左越界，不更新
+    //             gimbal_cmd_send.yaw = last_valid_yaw;
+    //         } else {
+    //             // 往回走，允许更新
+    //             last_valid_yaw = new_yaw;
+    //         }
+    //     } else {
+    //         // 在范围内，正常更新
+    //         last_valid_yaw = new_yaw;
+    //     }
+    // }
 
 }
 static void VisionControl()

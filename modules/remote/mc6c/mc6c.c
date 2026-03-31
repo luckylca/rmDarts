@@ -72,6 +72,9 @@ static void sbus_to_mc(const uint8_t *sbus_buf)
         if (abs(mc_ctrl[TEMP].rocker_r_) <= 50) mc_ctrl[TEMP].rocker_r_ = 0;
         if (abs(mc_ctrl[TEMP].rocker_r1) <= 50) mc_ctrl[TEMP].rocker_r1 = 0;
 
+        // 断连/脏帧时该通道会偶发固定异常值，直接在源头滤掉
+        if (mc_ctrl[TEMP].rocker_r1 == -960) mc_ctrl[TEMP].rocker_r1 = 0;
+
         mc_data_change(mc_ctrl[TEMP].switch_l);
         mc_data_change(mc_ctrl[TEMP].switch_r);
         

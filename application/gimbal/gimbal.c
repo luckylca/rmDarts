@@ -86,7 +86,7 @@ void GimbalInit()
         .callback = NULL,
         .id = NULL,
     };
-    encoder = EncoderInit(&encoder_spi_config);
+    // encoder = EncoderInit(&encoder_spi_config);
 
     gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     gimbal_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));

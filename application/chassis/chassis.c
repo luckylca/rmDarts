@@ -24,6 +24,7 @@
 #include "referee_UI.h"
 #include "arm_math.h"
 #include <stdbool.h>
+#include <stdint.h>
 #include "at24c02.h"
 
 /* 底盘应用包含的模块和信息存储,底盘是单例模式,因此不需要为底盘建立单独的结构体 */
@@ -108,6 +109,9 @@ extern int key;
 #define CHASSIS_3508_HOLD_DEADBAND 220.0f
 #define CHASSIS_3508_HOLD_RELEASE_DEADBAND 500.0f
 
+#define AUTO_ENTRY_LOAD_ACCEPT_ERR 1200.0f
+#define AUTO_ENTRY_LOAD_TIMEOUT_MS 3500.0f
+
 
 float v = -4000;  //转动速度
 
@@ -117,6 +121,36 @@ static float prev_err_load_l[4] = {0};
 static float prev_err_load_r[4] = {0};
 static float prev_err_rebound_l[4] = {0};
 static float prev_err_rebound_r[4] = {0};
+
+typedef enum {
+    AUTO_ENTRY_IDLE = 0,
+    AUTO_ENTRY_TO_LOAD,
+    AUTO_ENTRY_WAIT_1S,
+    AUTO_ENTRY_TO_REBOUND,
+    AUTO_ENTRY_DONE,
+} AutoEntryState_e;
+
+static chassis_mode_e s_last_chassis_mode = CHASSIS_ZERO_FORCE;
+static AutoEntryState_e s_auto_entry_state = AUTO_ENTRY_IDLE;
+static float s_auto_wait_start_ms = 0.0f;
+static float s_auto_stage_start_ms = 0.0f;
+
+static bool s_hold_l = false;
+static bool s_hold_r = false;
+
+static void ChassisDriveResetState(float *prev_l, float *prev_r)
+{
+    if (prev_l != NULL)
+    {
+        *prev_l = 0.0f;
+    }
+    if (prev_r != NULL)
+    {
+        *prev_r = 0.0f;
+    }
+    s_hold_l = false;
+    s_hold_r = false;
+}
 
 static float Clampf(float x, float min_val, float max_val)
 {
@@ -144,9 +178,6 @@ static bool ChassisAngleArrivedWithCross(float current_angle, float target_angle
 
 static bool ChassisDriveToTargetSpeedLoop(float target_l, float target_r, float *prev_l, float *prev_r)
 {
-    static bool hold_l = false;
-    static bool hold_r = false;
-
     float err_l = target_l - motor_lf->measure.total_angle;
     float err_r = target_r - motor_rf->measure.total_angle;
     float err_abs_l = fabsf(err_l);
@@ -154,28 +185,28 @@ static bool ChassisDriveToTargetSpeedLoop(float target_l, float target_r, float 
     float speed_abs_l;
     float speed_abs_r;
 
-    if (hold_l)
+    if (s_hold_l)
     {
         if (err_abs_l > CHASSIS_3508_HOLD_RELEASE_DEADBAND)
         {
-            hold_l = false;
+            s_hold_l = false;
         }
     }
     else if (err_abs_l <= CHASSIS_3508_HOLD_DEADBAND)
     {
-        hold_l = true;
+        s_hold_l = true;
     }
 
     if (err_abs_r <= CHASSIS_3508_HOLD_DEADBAND)
     {
-        hold_r = true;
+        s_hold_r = true;
     }
-    else if (hold_r && err_abs_r > CHASSIS_3508_HOLD_RELEASE_DEADBAND)
+    else if (s_hold_r && err_abs_r > CHASSIS_3508_HOLD_RELEASE_DEADBAND)
     {
-        hold_r = false;
+        s_hold_r = false;
     }
 
-    if (hold_l)
+    if (s_hold_l)
     {
         speed_abs_l = 0.0f;
     }
@@ -188,7 +219,7 @@ static bool ChassisDriveToTargetSpeedLoop(float target_l, float target_r, float 
         speed_abs_l = Clampf(CHASSIS_3508_POS2SPEED_KP * err_abs_l, CHASSIS_3508_MIN_SPEED_CMD, CHASSIS_3508_MAX_SPEED_CMD);
     }
 
-    if (hold_r)
+    if (s_hold_r)
     {
         speed_abs_r = 0.0f;
     }
@@ -345,6 +376,24 @@ void ChassisTask()
         chassis_cmd_recv = *(Chassis_Ctrl_Cmd_s *)CANCommGet(chasiss_can_comm);
     #endif // CHASSIS_BOARD
 
+    bool enter_auto = (chassis_cmd_recv.chassis_mode == AUTO_MODE) && (s_last_chassis_mode != AUTO_MODE);
+    bool leave_auto = (chassis_cmd_recv.chassis_mode != AUTO_MODE) && (s_last_chassis_mode == AUTO_MODE);
+
+    if (enter_auto)
+    {
+        s_auto_entry_state = AUTO_ENTRY_TO_LOAD;
+        s_auto_wait_start_ms = 0.0f;
+        s_auto_stage_start_ms = DWT_GetTimeline_ms();
+        ChassisDriveResetState(&prev_err_load_l[0], &prev_err_load_r[0]);
+    }
+    if (leave_auto)
+    {
+        s_auto_entry_state = AUTO_ENTRY_IDLE;
+        s_auto_wait_start_ms = 0.0f;
+        s_auto_stage_start_ms = 0.0f;
+        ChassisDriveResetState(NULL, NULL);
+    }
+
     // 计算同步PID
     // 计算左右电机相对于各自上电初始位置的偏差之和
     // 假设左右对称安装，一正一反运动，理想情况下相对位移之和应为0
@@ -379,106 +428,60 @@ void ChassisTask()
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
             break;
         case AUTO_MODE: 
-            // {
-                ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_LOAD_ANGLE, RF_CHASSIS_3508_LOAD_ANGLE, &prev_err_load_l[0], &prev_err_load_r[0]);
-                
-            //     DJIMotorEnable(motor_lf);
-            //     DJIMotorEnable(motor_rf);
-            //     uint8_t cur = DartSys.currentStep; 
-            //     // 防止数组越界
-            //     if (cur >= 4) return;
-            // if (cur == 0) {
-            //     //第一发镖
-            //     if (!DART_CHECK_BIT(0, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(0, FLAG_L_CHARGE_REACHED)) {
-            //         if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_LOAD_ANGLE, RF_CHASSIS_3508_LOAD_ANGLE,
-            //                                           &prev_err_load_l[0], &prev_err_load_r[0])) {
-            //             DART_SET_BIT(0, FLAG_R_CHARGE_REACHED);
-            //             DART_SET_BIT(0, FLAG_L_CHARGE_REACHED);
-            //         }
-            //     }
-            //     if(!DART_CHECK_BIT(0, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(0, FLAG_L_CHARGE_REACHED)) {
-            //         return;
-            //     }
-            //     if (!DART_CHECK_BIT(0, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(0, FLAG_L_REBOUND_REACHED)) {
-            //         if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_REBOUND_ANGLE, RF_CHASSIS_3508_REBOUND_ANGLE,
-            //                                           &prev_err_rebound_l[0], &prev_err_rebound_r[0])) {
-            //             DART_SET_BIT(0, FLAG_R_REBOUND_REACHED);
-            //             DART_SET_BIT(0, FLAG_L_REBOUND_REACHED);
-            //         }
-            //     }
-            //     return;
-            // }
+            DJIMotorEnable(motor_lf);
+            DJIMotorEnable(motor_rf);
+            DJIMotorOuterLoop(motor_lf, SPEED_LOOP);
+            DJIMotorOuterLoop(motor_rf, SPEED_LOOP);
 
-            // // 第二发镖
-            // if (cur == 1) {
-            //     if (!DART_CHECK_BIT(1, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(1, FLAG_L_CHARGE_REACHED)) {
-            //         if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_LOAD_ANGLE, RF_CHASSIS_3508_LOAD_ANGLE,
-            //                                           &prev_err_load_l[1], &prev_err_load_r[1])) {
-            //             DART_SET_BIT(1, FLAG_R_CHARGE_REACHED);
-            //             DART_SET_BIT(1, FLAG_L_CHARGE_REACHED);
-            //         }
-            //     }
-            //     if(!DART_CHECK_BIT(1, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(1, FLAG_L_CHARGE_REACHED)) {
-            //         return;
-            //     }
-            //     if (!DART_CHECK_BIT(1, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(1, FLAG_L_REBOUND_REACHED)) {
-            //         if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_REBOUND_ANGLE, RF_CHASSIS_3508_REBOUND_ANGLE,
-            //                                           &prev_err_rebound_l[1], &prev_err_rebound_r[1])) {
-            //             DART_SET_BIT(1, FLAG_R_REBOUND_REACHED);
-            //             DART_SET_BIT(1, FLAG_L_REBOUND_REACHED);
-            //         }
-            //     }
-            //     return;
-            // }
+            if (s_auto_entry_state == AUTO_ENTRY_TO_LOAD)
+            {
+                bool reached_by_drive = ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_LOAD_ANGLE, RF_CHASSIS_3508_LOAD_ANGLE,
+                                                                       &prev_err_load_l[0], &prev_err_load_r[0]);
+                float load_err_l = fabsf(LF_CHASSIS_3508_LOAD_ANGLE - motor_lf->measure.total_angle);
+                float load_err_r = fabsf(RF_CHASSIS_3508_LOAD_ANGLE - motor_rf->measure.total_angle);
+                bool reached_by_window = (load_err_l < AUTO_ENTRY_LOAD_ACCEPT_ERR) && (load_err_r < AUTO_ENTRY_LOAD_ACCEPT_ERR);
+                bool reached_by_timeout = (DWT_GetTimeline_ms() - s_auto_stage_start_ms) >= AUTO_ENTRY_LOAD_TIMEOUT_MS;
 
-            // // 第三发镖
-            // if (cur == 2) {
-            //     if (!DART_CHECK_BIT(2, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(2, FLAG_L_CHARGE_REACHED)) {
-            //         if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_LOAD_ANGLE, RF_CHASSIS_3508_LOAD_ANGLE,
-            //                                           &prev_err_load_l[2], &prev_err_load_r[2])) {
-            //             DART_SET_BIT(2, FLAG_R_CHARGE_REACHED);
-            //             DART_SET_BIT(2, FLAG_L_CHARGE_REACHED);
-            //         }
-            //     }
-            //     if(!DART_CHECK_BIT(2, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(2, FLAG_L_CHARGE_REACHED)) {
-            //         return;
-            //     }
-            //     if (!DART_CHECK_BIT(2, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(2, FLAG_L_REBOUND_REACHED)) {
-            //         if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_REBOUND_ANGLE, RF_CHASSIS_3508_REBOUND_ANGLE,
-            //                                           &prev_err_rebound_l[2], &prev_err_rebound_r[2])) {
-            //             DART_SET_BIT(2, FLAG_R_REBOUND_REACHED);
-            //             DART_SET_BIT(2, FLAG_L_REBOUND_REACHED);
-            //         }
-            //     }
-            //     return;
-            // }
+                if (reached_by_drive || reached_by_window || reached_by_timeout)
+                {
+                    DJIMotorSetRef(motor_lf, 0);
+                    DJIMotorSetRef(motor_rf, 0);
+                    s_auto_wait_start_ms = DWT_GetTimeline_ms();
+                    s_auto_entry_state = AUTO_ENTRY_WAIT_1S;
+                }
+            }
+            else if (s_auto_entry_state == AUTO_ENTRY_WAIT_1S)
+            {
+                DJIMotorSetRef(motor_lf, 0);
+                DJIMotorSetRef(motor_rf, 0);
+                if ((DWT_GetTimeline_ms() - s_auto_wait_start_ms) >= 1000.0f)
+                {
+                    ChassisDriveResetState(&prev_err_rebound_l[0], &prev_err_rebound_r[0]);
+                    s_auto_stage_start_ms = DWT_GetTimeline_ms();
+                    s_auto_entry_state = AUTO_ENTRY_TO_REBOUND;
+                }
+            }
+            else if (s_auto_entry_state == AUTO_ENTRY_TO_REBOUND)
+            {
+                if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_REBOUND_ANGLE, RF_CHASSIS_3508_REBOUND_ANGLE,
+                                                  &prev_err_rebound_l[0], &prev_err_rebound_r[0]))
+                {
+                    s_auto_entry_state = AUTO_ENTRY_DONE;
+                }
+            }
+            else
+            {
+                // 持续处于AUTO模式时，不重复触发进入序列
+                DJIMotorSetRef(motor_lf, 0);
+                DJIMotorSetRef(motor_rf, 0);
+            }
 
-            // // 第四发镖
-            // if (cur == 3) {
-            //     if (!DART_CHECK_BIT(3, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(3, FLAG_L_CHARGE_REACHED)) {
-            //         if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_LOAD_ANGLE, RF_CHASSIS_3508_LOAD_ANGLE,
-            //                                           &prev_err_load_l[3], &prev_err_load_r[3])) {
-            //             DART_SET_BIT(3, FLAG_R_CHARGE_REACHED);
-            //             DART_SET_BIT(3, FLAG_L_CHARGE_REACHED);
-            //         }
-            //     }
-            //     if(!DART_CHECK_BIT(3, FLAG_R_CHARGE_REACHED) || !DART_CHECK_BIT(3, FLAG_L_CHARGE_REACHED)) {
-            //         return;
-            //     }
-            //     if (!DART_CHECK_BIT(3, FLAG_R_REBOUND_REACHED) || !DART_CHECK_BIT(3, FLAG_L_REBOUND_REACHED)) {
-            //         if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_REBOUND_ANGLE, RF_CHASSIS_3508_REBOUND_ANGLE,
-            //                                           &prev_err_rebound_l[3], &prev_err_rebound_r[3])) {
-            //             DART_SET_BIT(3, FLAG_R_REBOUND_REACHED);
-            //             DART_SET_BIT(3, FLAG_L_REBOUND_REACHED);
-            //         }
-            //     }
-            // return;
-        // }
-        // break;
             break;
         default:
             break;
     }
+
+            s_last_chassis_mode = chassis_cmd_recv.chassis_mode;
     
 
 

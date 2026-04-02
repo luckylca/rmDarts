@@ -34,7 +34,7 @@
 /* 机器人重要参数定义,注意根据不同机器人进行修改,浮点数需要以.0或f结尾,无符号以u结尾 */
 
 #define BANJI_OPEN_ANGLE 0.095f    // 扳机舵机打开角度
-#define BANJI_CLOSE_ANGLE 0.065f // 扳机舵机关闭角度
+#define BANJI_CLOSE_ANGLE 0.080f // 扳机舵机关闭角度
 #define GRIPPER_CLOSE_ANGLE 0.000f // 扳机舵机发射角度
 #define GRIPPER_1_LAY_ANGLE 0.060f // 夹爪放置角度
 #define GRIPPER_1_NORMAL_ANGLE 0.030f // 夹爪正常角度
@@ -59,7 +59,7 @@
 #define ENCODER_LEFT_LIMIT  0x400     // 左边encoder限位值
 #define ENCODER_RIGHT_LIMIT 0x4b2    // 右边encoder限位值
 
-#define YELLOW_25M_SHOOT_ANGLE -578111.8f // 黄色25m发射位置
+#define YELLOW_25M_SHOOT_ANGLE 0.8f // 黄色25m发射位置
 #define GREEN_25M_SHOOT_ANGLE -578111.8f //  绿色25m发射位置
 #define BLUE_25M_SHOOT_ANGLE -578111.8f //  蓝色25m发射位置
 #define PURPLE_25M_SHOOT_ANGLE -578111.8f // 紫色25m发射位置

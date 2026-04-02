@@ -241,8 +241,8 @@ static bool ChassisDriveToTargetSpeedLoop(float target_l, float target_r, float 
     DJIMotorSetRef(motor_lf, speed_ref_l);
     DJIMotorSetRef(motor_rf, speed_ref_r);
 
-    bool left_arrived = ChassisAngleArrivedWithCross(motor_lf->measure.total_angle, target_l, MOTOR_ANGLE_DEADBAND, prev_l);
-    bool right_arrived = ChassisAngleArrivedWithCross(motor_rf->measure.total_angle, target_r, MOTOR_ANGLE_DEADBAND, prev_r);
+    bool left_arrived = ChassisAngleArrivedWithCross(motor_lf->measure.total_angle, target_l, 500.0f, prev_l);
+    bool right_arrived = ChassisAngleArrivedWithCross(motor_rf->measure.total_angle, target_r, 500.0f, prev_r);
 
     if (left_arrived && right_arrived)
     {
@@ -252,6 +252,78 @@ static bool ChassisDriveToTargetSpeedLoop(float target_l, float target_r, float 
     }
 
     return false;
+}
+
+static void ChassisRunAutoPullSequence(bool enter_auto, bool leave_auto)
+{
+    if (enter_auto)
+    {
+        s_auto_entry_state = AUTO_ENTRY_TO_LOAD;
+        s_auto_wait_start_ms = 0.0f;
+        s_auto_stage_start_ms = DWT_GetTimeline_ms();
+        ChassisDriveResetState(&prev_err_load_l[0], &prev_err_load_r[0]);
+    }
+    if (leave_auto)
+    {
+        s_auto_entry_state = AUTO_ENTRY_IDLE;
+        s_auto_wait_start_ms = 0.0f;
+        s_auto_stage_start_ms = 0.0f;
+        ChassisDriveResetState(NULL, NULL);
+        DJIMotorSetRef(motor_lf, 0);
+        DJIMotorSetRef(motor_rf, 0);
+        return;
+    }
+
+    DJIMotorEnable(motor_lf);
+    DJIMotorEnable(motor_rf);
+    DJIMotorOuterLoop(motor_lf, SPEED_LOOP);
+    DJIMotorOuterLoop(motor_rf, SPEED_LOOP);
+
+    if (s_auto_entry_state == AUTO_ENTRY_TO_LOAD)
+    {
+        bool reached_by_drive = ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_LOAD_ANGLE, RF_CHASSIS_3508_LOAD_ANGLE,
+                                                               &prev_err_load_l[0], &prev_err_load_r[0]);
+        float load_err_l = fabsf(LF_CHASSIS_3508_LOAD_ANGLE - motor_lf->measure.total_angle);
+        float load_err_r = fabsf(RF_CHASSIS_3508_LOAD_ANGLE - motor_rf->measure.total_angle);
+        bool reached_by_window = (load_err_l < AUTO_ENTRY_LOAD_ACCEPT_ERR) && (load_err_r < AUTO_ENTRY_LOAD_ACCEPT_ERR);
+        bool reached_by_timeout = (DWT_GetTimeline_ms() - s_auto_stage_start_ms) >= AUTO_ENTRY_LOAD_TIMEOUT_MS;
+
+        if (reached_by_drive || reached_by_window || reached_by_timeout)
+        {
+            DJIMotorSetRef(motor_lf, 0);
+            DJIMotorSetRef(motor_rf, 0);
+            s_auto_wait_start_ms = DWT_GetTimeline_ms();
+            s_auto_entry_state = AUTO_ENTRY_WAIT_1S;
+        }
+    }
+    else if (s_auto_entry_state == AUTO_ENTRY_WAIT_1S)
+    {
+        DJIMotorSetRef(motor_lf, 0);
+        DJIMotorSetRef(motor_rf, 0);
+        if ((DWT_GetTimeline_ms() - s_auto_wait_start_ms) >= 1000.0f)
+        {
+            ChassisDriveResetState(&prev_err_rebound_l[0], &prev_err_rebound_r[0]);
+            s_auto_stage_start_ms = DWT_GetTimeline_ms();
+            s_auto_entry_state = AUTO_ENTRY_TO_REBOUND;
+        }
+    }
+    else if (s_auto_entry_state == AUTO_ENTRY_TO_REBOUND)
+    {
+        if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_REBOUND_ANGLE, RF_CHASSIS_3508_REBOUND_ANGLE,
+                                          &prev_err_rebound_l[0], &prev_err_rebound_r[0]))
+        {
+            s_auto_entry_state = AUTO_ENTRY_DONE;
+            DART_SET_BIT(0, FLAG_L_CHARGE_REACHED);
+            DART_SET_BIT(0, FLAG_R_CHARGE_REACHED);
+            DART_SET_BIT(0, FLAG_L_REBOUND_REACHED);
+            DART_SET_BIT(0, FLAG_R_REBOUND_REACHED);
+        }
+    }
+    else
+    {
+        DJIMotorSetRef(motor_lf, 0);
+        DJIMotorSetRef(motor_rf, 0);
+    }
 }
 
 void ChassisInit()
@@ -379,19 +451,9 @@ void ChassisTask()
     bool enter_auto = (chassis_cmd_recv.chassis_mode == AUTO_MODE) && (s_last_chassis_mode != AUTO_MODE);
     bool leave_auto = (chassis_cmd_recv.chassis_mode != AUTO_MODE) && (s_last_chassis_mode == AUTO_MODE);
 
-    if (enter_auto)
-    {
-        s_auto_entry_state = AUTO_ENTRY_TO_LOAD;
-        s_auto_wait_start_ms = 0.0f;
-        s_auto_stage_start_ms = DWT_GetTimeline_ms();
-        ChassisDriveResetState(&prev_err_load_l[0], &prev_err_load_r[0]);
-    }
     if (leave_auto)
     {
-        s_auto_entry_state = AUTO_ENTRY_IDLE;
-        s_auto_wait_start_ms = 0.0f;
-        s_auto_stage_start_ms = 0.0f;
-        ChassisDriveResetState(NULL, NULL);
+        ChassisRunAutoPullSequence(false, true);
     }
 
     // 计算同步PID
@@ -427,55 +489,8 @@ void ChassisTask()
             DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
             break;
-        case AUTO_MODE: 
-            DJIMotorEnable(motor_lf);
-            DJIMotorEnable(motor_rf);
-            DJIMotorOuterLoop(motor_lf, SPEED_LOOP);
-            DJIMotorOuterLoop(motor_rf, SPEED_LOOP);
-
-            if (s_auto_entry_state == AUTO_ENTRY_TO_LOAD)
-            {
-                bool reached_by_drive = ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_LOAD_ANGLE, RF_CHASSIS_3508_LOAD_ANGLE,
-                                                                       &prev_err_load_l[0], &prev_err_load_r[0]);
-                float load_err_l = fabsf(LF_CHASSIS_3508_LOAD_ANGLE - motor_lf->measure.total_angle);
-                float load_err_r = fabsf(RF_CHASSIS_3508_LOAD_ANGLE - motor_rf->measure.total_angle);
-                bool reached_by_window = (load_err_l < AUTO_ENTRY_LOAD_ACCEPT_ERR) && (load_err_r < AUTO_ENTRY_LOAD_ACCEPT_ERR);
-                bool reached_by_timeout = (DWT_GetTimeline_ms() - s_auto_stage_start_ms) >= AUTO_ENTRY_LOAD_TIMEOUT_MS;
-
-                if (reached_by_drive || reached_by_window || reached_by_timeout)
-                {
-                    DJIMotorSetRef(motor_lf, 0);
-                    DJIMotorSetRef(motor_rf, 0);
-                    s_auto_wait_start_ms = DWT_GetTimeline_ms();
-                    s_auto_entry_state = AUTO_ENTRY_WAIT_1S;
-                }
-            }
-            else if (s_auto_entry_state == AUTO_ENTRY_WAIT_1S)
-            {
-                DJIMotorSetRef(motor_lf, 0);
-                DJIMotorSetRef(motor_rf, 0);
-                if ((DWT_GetTimeline_ms() - s_auto_wait_start_ms) >= 1000.0f)
-                {
-                    ChassisDriveResetState(&prev_err_rebound_l[0], &prev_err_rebound_r[0]);
-                    s_auto_stage_start_ms = DWT_GetTimeline_ms();
-                    s_auto_entry_state = AUTO_ENTRY_TO_REBOUND;
-                }
-            }
-            else if (s_auto_entry_state == AUTO_ENTRY_TO_REBOUND)
-            {
-                if (ChassisDriveToTargetSpeedLoop(LF_CHASSIS_3508_REBOUND_ANGLE, RF_CHASSIS_3508_REBOUND_ANGLE,
-                                                  &prev_err_rebound_l[0], &prev_err_rebound_r[0]))
-                {
-                    s_auto_entry_state = AUTO_ENTRY_DONE;
-                }
-            }
-            else
-            {
-                // 持续处于AUTO模式时，不重复触发进入序列
-                DJIMotorSetRef(motor_lf, 0);
-                DJIMotorSetRef(motor_rf, 0);
-            }
-
+        case AUTO_MODE:
+            ChassisRunAutoPullSequence(enter_auto, leave_auto);
             break;
         default:
             break;

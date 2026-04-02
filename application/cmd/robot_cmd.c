@@ -234,7 +234,6 @@ static void RemoteControlSet()
             // gimbal_cmd_send.yaw = YELLOW_25M_YAW_ANGLE;
         }
         else if(rc_data[TEMP].none[0] == 0x708 && rc_data[TEMP].none[1] != 0xc8 && rc_data[TEMP].none[1] != 0x708)
-            // shoot_cmd_send.shoot_data = GREEN_25M_SHOOT_ANGLE;
         {
             shoot_cmd_send.GripperTest=1;
             // gimbal_cmd_send.yaw = GREEN_25M_YAW_ANGLE;
@@ -266,11 +265,9 @@ static void RemoteControlSet()
     }
     else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_UP)
     {
-        chassis_cmd_send.chassis_mode = AUTO_MODE;//CHASSIS_FOLLOW_GIMBAL_YAW;
-        // shoot_cmd_send.shoot_mode = SHOOT_AUTO;
-        // shoot_cmd_send.load_mode = AUTO_LOAD;
-        // shoot_cmd_send.banji_mode = BANJI_AUTO;
-        // shoot_cmd_send.rotate_mode = ROTATE_AUTO;  
+        shoot_cmd_send.shoot_mode = SHOOT_AUTO; 
+        gimbal_cmd_send.gimbal_mode = AUTO_DART;
+        chassis_cmd_send.chassis_mode = AUTO_MODE;
     }
 
     //下面是对每个模式的细化设置，就是在 TEST 模式下的对某个模块做其他测试

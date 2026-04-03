@@ -254,7 +254,7 @@ static bool ChassisDriveToTargetSpeedLoop(float target_l, float target_r, float 
     return false;
 }
 
-static void ChassisRunAutoPullSequence(bool enter_auto, bool leave_auto)
+static void ChassisRunAutoPullSequence(bool enter_auto, bool leave_auto, int idx)
 {
     if (enter_auto)
     {
@@ -313,10 +313,10 @@ static void ChassisRunAutoPullSequence(bool enter_auto, bool leave_auto)
                                           &prev_err_rebound_l[0], &prev_err_rebound_r[0]))
         {
             s_auto_entry_state = AUTO_ENTRY_DONE;
-            DART_SET_BIT(0, FLAG_L_CHARGE_REACHED);
-            DART_SET_BIT(0, FLAG_R_CHARGE_REACHED);
-            DART_SET_BIT(0, FLAG_L_REBOUND_REACHED);
-            DART_SET_BIT(0, FLAG_R_REBOUND_REACHED);
+            DART_SET_BIT(idx, FLAG_L_CHARGE_REACHED);
+            DART_SET_BIT(idx, FLAG_R_CHARGE_REACHED);
+            DART_SET_BIT(idx, FLAG_L_REBOUND_REACHED);
+            DART_SET_BIT(idx, FLAG_R_REBOUND_REACHED);
         }
     }
     else
@@ -453,7 +453,7 @@ void ChassisTask()
 
     if (leave_auto)
     {
-        ChassisRunAutoPullSequence(false, true);
+        ChassisRunAutoPullSequence(false, true,1);
     }
 
     // 计算同步PID
@@ -490,7 +490,8 @@ void ChassisTask()
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
             break;
         case AUTO_MODE:
-            ChassisRunAutoPullSequence(enter_auto, leave_auto);
+            int idx = DartSys.currentStep;
+            ChassisRunAutoPullSequence(enter_auto, leave_auto,1);
             break;
         default:
             break;

@@ -110,7 +110,7 @@ void GimbalTask()
         DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw); 
         break;
     case AUTO_DART:
-        DART_SET_BIT(0, FLAG_GIMBAL_AIMED);
+        DART_SET_BIT(1, FLAG_GIMBAL_AIMED);
         DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw);
         // 第一发镖
         // {

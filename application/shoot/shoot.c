@@ -868,6 +868,10 @@ void ShootTask()
 		DJIMotorEnable(chargeLoader);
 		DMMotorEnable(rotateChageDarts);
 		DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
+		int idx = DartSys.currentStep;
+
+		//这是第一发飞镖的测试逻辑
+		/*
 		if(tmpa==1) {
 			break;
 		}
@@ -876,10 +880,6 @@ void ShootTask()
 			DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
 			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
 				DART_SET_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS);
-				// DART_SET_BIT(0, FLAG_L_CHARGE_REACHED);
-				// DART_SET_BIT(0, FLAG_R_CHARGE_REACHED);
-				// DART_SET_BIT(0, FLAG_L_REBOUND_REACHED);
-				// DART_SET_BIT(0, FLAG_R_REBOUND_REACHED);
 			}
 			return;
 		}
@@ -897,6 +897,45 @@ void ShootTask()
 			tmpb=2;
 			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
 			DART_SET_BIT(0, FLAG_FIRED);
+			tmpa=1;
+		}
+		*/
+
+		/*第二发飞镖的测试逻辑*/
+		if(tmpa==1) {
+			break;
+		}
+		if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_LOAD_POS)) {
+			DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_POS);
+			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_POS,RELOAD_TRIGGER_DEADBAND)) {// 到达位置后设置标志位
+				DART_SET_BIT(1, FLAG_TRIGGER_AT_LOAD_POS);
+			}
+			return;
+		}
+		setKey1();
+		if(!DART_CHECK_BIT(1,FLAG_DART_DROPPED))
+			return;
+		if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS)) {
+			DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
+			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+				DART_SET_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS);
+			}
+			return;
+		}
+		if (DART_CHECK_MASK(1, MASK_READY_TO_FIRE)) {
+			// 扳机打开，发射飞镖
+			tmpb=1;
+			if(start_time == 0) {
+				start_time = HAL_GetTick();
+			}
+			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+			uint32_t dt = HAL_GetTick() - start_time;
+			if(dt < 5000) {
+				return; // 延时200ms确保扳机打开
+			}
+			tmpb=2;
+			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
+			DART_SET_BIT(1, FLAG_FIRED);
 			tmpa=1;
 		}
 		// 这是整个流程的 auto

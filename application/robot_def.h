@@ -48,7 +48,7 @@
 #define LF_CHASSIS_3508_REBOUND_ANGLE 7300.0f // 3508反弹到位角度 
 #define RF_CHASSIS_3508_REBOUND_ANGLE -7300.0f // 3508反弹到位角度
 
-#define RELOAD_TRIGGER_POS -208505.0f
+#define RELOAD_TRIGGER_POS -350155.0f
 #define RELOAD_TRIGGER_DEADBAND 100.0f
 
 #define ROTATE_1_CHANGE_DARTS_ANGLE 0.0f    // 旋转换弹第一发电机绝对位置,也就是初始值
@@ -59,10 +59,10 @@
 #define ENCODER_LEFT_LIMIT  0x400     // 左边encoder限位值
 #define ENCODER_RIGHT_LIMIT 0x4b2    // 右边encoder限位值
 
-#define YELLOW_25M_SHOOT_ANGLE 0.8f // 黄色25m发射位置
-#define GREEN_25M_SHOOT_ANGLE -578111.8f //  绿色25m发射位置
-#define BLUE_25M_SHOOT_ANGLE -578111.8f //  蓝色25m发射位置
-#define PURPLE_25M_SHOOT_ANGLE -578111.8f // 紫色25m发射位置
+#define YELLOW_25M_SHOOT_ANGLE -485246.7f // 黄色25m发射位置
+#define GREEN_25M_SHOOT_ANGLE -485246.7f //  绿色25m发射位置
+#define BLUE_25M_SHOOT_ANGLE -485246.7f //  蓝色25m发射位置
+#define PURPLE_25M_SHOOT_ANGLE -485246.7f // 紫色25m发射位置
 
 #define YELLOW_25M_YAW_ANGLE -41317.6f // 黄色25m发射位置
 #define GREEN_25M_YAW_ANGLE 15584.0f //  绿色25m发射位置

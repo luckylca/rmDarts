@@ -134,6 +134,7 @@ static chassis_mode_e s_last_chassis_mode = CHASSIS_ZERO_FORCE;
 static AutoEntryState_e s_auto_entry_state = AUTO_ENTRY_IDLE;
 static float s_auto_wait_start_ms = 0.0f;
 static float s_auto_stage_start_ms = 0.0f;
+static int s_auto_active_idx = -1;
 
 static bool s_hold_l = false;
 static bool s_hold_r = false;
@@ -256,19 +257,36 @@ static bool ChassisDriveToTargetSpeedLoop(float target_l, float target_r, float 
 
 static void ChassisRunAutoPullSequence(bool enter_auto, bool leave_auto, int idx)
 {
-    if (enter_auto)
-    {
-        s_auto_entry_state = AUTO_ENTRY_TO_LOAD;
-        s_auto_wait_start_ms = 0.0f;
-        s_auto_stage_start_ms = DWT_GetTimeline_ms();
-        ChassisDriveResetState(&prev_err_load_l[0], &prev_err_load_r[0]);
-    }
     if (leave_auto)
     {
         s_auto_entry_state = AUTO_ENTRY_IDLE;
         s_auto_wait_start_ms = 0.0f;
         s_auto_stage_start_ms = 0.0f;
+        s_auto_active_idx = -1;
         ChassisDriveResetState(NULL, NULL);
+        DJIMotorSetRef(motor_lf, 0);
+        DJIMotorSetRef(motor_rf, 0);
+        return;
+    }
+
+    if (enter_auto)
+    {
+        bool can_start = (s_auto_entry_state == AUTO_ENTRY_IDLE) ||
+                         ((s_auto_entry_state == AUTO_ENTRY_DONE) && (idx != s_auto_active_idx));
+
+        if (can_start && idx >= 0 && idx < 4)
+        {
+            s_auto_active_idx = idx;
+            s_auto_entry_state = AUTO_ENTRY_TO_LOAD;
+            s_auto_wait_start_ms = 0.0f;
+            s_auto_stage_start_ms = DWT_GetTimeline_ms();
+            DART_CLEAR_BIT(idx, FLAG_L_CHARGE_REACHED | FLAG_R_CHARGE_REACHED | FLAG_L_REBOUND_REACHED | FLAG_R_REBOUND_REACHED);
+            ChassisDriveResetState(&prev_err_load_l[0], &prev_err_load_r[0]);
+        }
+    }
+
+    if (s_auto_entry_state == AUTO_ENTRY_IDLE || s_auto_entry_state == AUTO_ENTRY_DONE)
+    {
         DJIMotorSetRef(motor_lf, 0);
         DJIMotorSetRef(motor_rf, 0);
         return;
@@ -313,10 +331,13 @@ static void ChassisRunAutoPullSequence(bool enter_auto, bool leave_auto, int idx
                                           &prev_err_rebound_l[0], &prev_err_rebound_r[0]))
         {
             s_auto_entry_state = AUTO_ENTRY_DONE;
-            DART_SET_BIT(idx, FLAG_L_CHARGE_REACHED);
-            DART_SET_BIT(idx, FLAG_R_CHARGE_REACHED);
-            DART_SET_BIT(idx, FLAG_L_REBOUND_REACHED);
-            DART_SET_BIT(idx, FLAG_R_REBOUND_REACHED);
+            if (s_auto_active_idx >= 0 && s_auto_active_idx < 4)
+            {
+                DART_SET_BIT(s_auto_active_idx, FLAG_L_CHARGE_REACHED);
+                DART_SET_BIT(s_auto_active_idx, FLAG_R_CHARGE_REACHED);
+                DART_SET_BIT(s_auto_active_idx, FLAG_L_REBOUND_REACHED);
+                DART_SET_BIT(s_auto_active_idx, FLAG_R_REBOUND_REACHED);
+            }
         }
     }
     else
@@ -436,8 +457,8 @@ void ChassisInit()
     chassis_pub = PubRegister("chassis_feed", sizeof(Chassis_Upload_Data_s));
 #endif // ONE_BOARD
 }
-
-
+static int tmpa=0;
+static int lastcur = -1;
 void ChassisTask()
 {
 
@@ -448,12 +469,11 @@ void ChassisTask()
         chassis_cmd_recv = *(Chassis_Ctrl_Cmd_s *)CANCommGet(chasiss_can_comm);
     #endif // CHASSIS_BOARD
 
-    bool enter_auto = (chassis_cmd_recv.chassis_mode == AUTO_MODE) && (s_last_chassis_mode != AUTO_MODE);
     bool leave_auto = (chassis_cmd_recv.chassis_mode != AUTO_MODE) && (s_last_chassis_mode == AUTO_MODE);
-
     if (leave_auto)
     {
-        ChassisRunAutoPullSequence(false, true,1);
+        ChassisRunAutoPullSequence(false, true, 0); // 给底层发急停信号
+        lastcur = -1; // 重置记忆。保证下次进 AUTO 还能重新触发！
     }
 
     // 计算同步PID
@@ -490,8 +510,48 @@ void ChassisTask()
             DJIMotorSetRef(motor_rf, chassis_cmd_recv.v1);
             break;
         case AUTO_MODE:
-            int idx = DartSys.currentStep;
-            ChassisRunAutoPullSequence(enter_auto, leave_auto,1);
+            if(tmpa==1) {
+                break;
+            }
+            int cur = DartSys.currentStep;
+            switch (cur)
+            {
+                case 0:
+                    if(lastcur!=cur) {
+                        ChassisRunAutoPullSequence(true, false,0);
+                    }
+                    else {
+                        ChassisRunAutoPullSequence(false, false,0);
+                    }
+                    break;
+                case 1:
+                    if(lastcur!=cur) {
+                        ChassisRunAutoPullSequence(true, false,1);
+                    }
+                    else {
+                        ChassisRunAutoPullSequence(false, false,1);
+                    }
+                    break;
+                case 2:
+                    if(lastcur!=cur) {
+                        ChassisRunAutoPullSequence(true, false,2);
+                    }
+                    else {
+                        ChassisRunAutoPullSequence(false, false,2);
+                    }
+                    break;
+                case 3:
+                    if(lastcur!=cur) {
+                        ChassisRunAutoPullSequence(true, false,3);
+                    }
+                    else {
+                        ChassisRunAutoPullSequence(false, false,3);
+                    }
+                    break;
+                default:
+                    break;
+            }
+            lastcur = cur;
             break;
         default:
             break;

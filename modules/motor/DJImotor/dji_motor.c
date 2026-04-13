@@ -331,16 +331,26 @@ void DJIMotorControl()
             pid_ref = PIDCalculate(&motor_controller->speed_PID, pid_measure, pid_ref);
         }
 
-        // 计算电流环,目前只要启用了电流环就计算,不管外层闭环是什么,并且电流只有电机自身传感器的反馈
-        if (motor_setting->feedforward_flag & CURRENT_FEEDFORWARD)
-            pid_ref += *motor_controller->current_feedforward_ptr;
-        if (motor_setting->close_loop_type & CURRENT_LOOP)
+        if (motor->stop_flag == MOTOR_STOP)
         {
-            pid_ref = PIDCalculate(&motor_controller->current_PID, measure->real_current, pid_ref);
+            // 急停/停机时直接将电流环输出钳为0,避免继续计算并产生iout
+            motor_controller->current_PID.ITerm = 0;
+            motor_controller->current_PID.Err = 0;
+            pid_ref = 0;
         }
+        else
+        {
+            // 计算电流环,目前只要启用了电流环就计算,不管外层闭环是什么,并且电流只有电机自身传感器的反馈
+            if (motor_setting->feedforward_flag & CURRENT_FEEDFORWARD)
+                pid_ref += *motor_controller->current_feedforward_ptr;
+            if (motor_setting->close_loop_type & CURRENT_LOOP)
+            {
+                pid_ref = PIDCalculate(&motor_controller->current_PID, measure->real_current, pid_ref);
+            }
 
-        if (motor_setting->feedback_reverse_flag == FEEDBACK_DIRECTION_REVERSE)
-            pid_ref *= -1;
+            if (motor_setting->feedback_reverse_flag == FEEDBACK_DIRECTION_REVERSE)
+                pid_ref *= -1;
+        }
 
         // 获取最终输出
         set = (int16_t)pid_ref;
@@ -350,7 +360,7 @@ void DJIMotorControl()
         sender_assignment[group].tx_buff[2 * num] = (uint8_t)(set >> 8);         // 低八位
         sender_assignment[group].tx_buff[2 * num + 1] = (uint8_t)(set & 0x00ff); // 高八位
 
-        // 若该电机处于停止状态,直接将buff置零
+        // 双重保险: 停机时保持发送零电流
         if (motor->stop_flag == MOTOR_STOP)
             memset(sender_assignment[group].tx_buff + 2 * num, 0, sizeof(uint16_t));
     }

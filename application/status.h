@@ -27,10 +27,7 @@
 // ==========================================
 
 // 旋转换弹并且扳机位置到位了，就可以装弹了
-#define MASK_READY_TO_LOAD (FLAG_RELOAD_ROTATED |  \
-                            FLAG_L_CHARGE_REACHED | FLAG_R_CHARGE_REACHED |   \
-                            FLAG_L_REBOUND_REACHED | FLAG_R_REBOUND_REACHED | \
-                            FLAG_TRIGGER_AT_LOAD_POS)
+#define MASK_READY_TO_LOAD (FLAG_L_CHARGE_REACHED | FLAG_R_CHARGE_REACHED)
 
 #define MASK_READY_TO_SHOOT (FLAG_RELOAD_ROTATED |  \
                             FLAG_DART_DROPPED |  \

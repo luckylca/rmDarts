@@ -265,10 +265,10 @@ void servo_magnet_init(int *initFlag)
 		gripper1_wait_tick = HAL_GetTick();
 	
 	if (HAL_GetTick() - gripper1_wait_tick < 1500)
-		ServoSetAngle(gripper1_motor, GRIPPER_2_NORMAL_ANGLE);
+		ServoSetAngle(gripper2_motor, GRIPPER_1_NORMAL_ANGLE);
 	else
 	{
-		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
+		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
 		isGripper1Init = 1;
 	}
 
@@ -276,10 +276,10 @@ void servo_magnet_init(int *initFlag)
 		gripper2_wait_tick = HAL_GetTick();
 
 	if (HAL_GetTick() - gripper2_wait_tick < 1500)
-		ServoSetAngle(gripper2_motor, GRIPPER_1_NORMAL_ANGLE);
+		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
 	else
 	{
-		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
+		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
 		isGripper2Init = 1;
 	}
 
@@ -287,10 +287,10 @@ void servo_magnet_init(int *initFlag)
 		gripper3_wait_tick = HAL_GetTick();
 
 	if (HAL_GetTick() - gripper3_wait_tick < 1500)
-		ServoSetAngle(gripper3_motor, GRIPPER_3_NORMAL_ANGLE);
+		ServoSetAngle(gripper1_motor, GRIPPER_3_NORMAL_ANGLE);
 	else
 	{
-		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
+		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
 		isGripper3Init = 1;
 	}
 	if(isGripper1Init&&isGripper2Init&&isGripper3Init)
@@ -363,7 +363,7 @@ void ShootInit()
 						.Kp = 10, // 10
 						.Ki = 0,
 						.Kd = 0,
-						.MaxOut = 500000,
+						.MaxOut = 300000,
 					},
 				.speed_PID =
 					{
@@ -592,7 +592,42 @@ void setKey1()
 		DART_SET_BIT(1, FLAG_RELOAD_ROTATED);//先默认置位
 	}
 }
+void setKey1Auto()
+{
+	dm_target_angle = ROTATE_2_CHANGE_DARTS_ANGLE; // 设置目标角度为第二发位置
+	if ((fabs(rotateChageDarts->measure.position - dm_target_angle) > 0.1f) || (!DART_CHECK_MASK(1, MASK_READY_TO_LOAD)))
+	{
+		key1_start_tick = 0; // 未到位时重置时间戳
+		return;
+	}
 
+	if (key1_start_tick == 0) {
+		key1_start_tick = HAL_GetTick();
+		if(key1_start_tick == 0) key1_start_tick = 1;
+	}
+
+	uint32_t dt = HAL_GetTick() - key1_start_tick;
+
+	if (dt < 1000) {
+		ServoSetAngle(gripper2_motor, GRIPPER_1_LAY_ANGLE);
+		relay_control(3, 0);
+	}
+	else if (dt < 1500) { // 1500 + 500
+		ServoSetAngle(gripper2_motor, GRIPPER_1_LAY_ANGLE);
+		relay_control(3, 1);
+	}
+	else if (dt < 3500) { // 2000 + 1500
+		ServoSetAngle(gripper2_motor, GRIPPER_1_NORMAL_ANGLE);
+		relay_control(3, 1);
+	}
+	else {
+		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(3, 0);
+		DART_SET_BIT(1, FLAG_ARM_ANGLE_READY);
+		DART_SET_BIT(1, FLAG_DART_DROPPED);
+		DART_SET_BIT(1, FLAG_RELOAD_ROTATED);//先默认置位
+	}
+}
 void setKey2()
 {
 	dm_target_angle = ROTATE_3_CHANGE_DARTS_ANGLE; // 设置目标角度为第三发位置
@@ -610,25 +645,59 @@ void setKey2()
 	uint32_t dt = HAL_GetTick() - key2_start_tick;
 
 	if (dt < 1500) {
-		ServoSetAngle(gripper1_motor, GRIPPER_2_LAY_ANGLE);
+		ServoSetAngle(gripper3_motor, GRIPPER_2_LAY_ANGLE);
 		relay_control(1, 0);
 	}
 	else if (dt < 2000) {
-		ServoSetAngle(gripper1_motor, GRIPPER_2_NORMAL_ANGLE);
+		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
 		relay_control(1, 1);
 	}
 	else if (dt < 3500) {
-		ServoSetAngle(gripper1_motor, GRIPPER_2_NORMAL_ANGLE);
+		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
 		relay_control(1, 1);
 	}
 	else {
-		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
+		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
 		relay_control(1, 0);
 		DART_SET_BIT(2, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(2, FLAG_DART_DROPPED);
 	}
 }
+void setKey2Auto()
+{
+	dm_target_angle = ROTATE_3_CHANGE_DARTS_ANGLE; // 设置目标角度为第三发位置
+	if ((fabs(rotateChageDarts->measure.position - dm_target_angle) > 0.1f) || (!DART_CHECK_MASK(2, MASK_READY_TO_LOAD)))
+	{
+		key2_start_tick = 0;
+		return;
+	}
 
+	if (key2_start_tick == 0) {
+		key2_start_tick = HAL_GetTick();
+		if(key2_start_tick == 0) key2_start_tick = 1;
+	}
+
+	uint32_t dt = HAL_GetTick() - key2_start_tick;
+
+	if (dt < 1500) {
+		ServoSetAngle(gripper3_motor, GRIPPER_2_LAY_ANGLE);
+		relay_control(1, 0);
+	}
+	else if (dt < 2000) {
+		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
+		relay_control(1, 1);
+	}
+	else if (dt < 3500) {
+		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
+		relay_control(1, 1);
+	}
+	else {
+		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(1, 0);
+		DART_SET_BIT(2, FLAG_ARM_ANGLE_READY);
+		DART_SET_BIT(2, FLAG_DART_DROPPED);
+	}
+}
 void setKey3()
 {
 	dm_target_angle = ROTATE_4_CHANGE_DARTS_ANGLE; // 设置目标角度为第四发位置
@@ -646,25 +715,59 @@ void setKey3()
 	uint32_t dt = HAL_GetTick() - key3_start_tick;
 
 	if (dt < 1000) {
-		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
+		ServoSetAngle(gripper1_motor, GRIPPER_3_LAY_ANGLE);
 		relay_control(2, 0);
 	}
 	else if (dt < 1500) {
-		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
+		ServoSetAngle(gripper1_motor, GRIPPER_3_LAY_ANGLE);
 		relay_control(2, 1);
 	}
 	else if (dt < 3500) {
-		ServoSetAngle(gripper3_motor, GRIPPER_3_NORMAL_ANGLE);
+		ServoSetAngle(gripper1_motor, GRIPPER_3_NORMAL_ANGLE);
 		relay_control(2, 1);
 	}
 	else {
-		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
+		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
 		relay_control(2, 0);
 		DART_SET_BIT(3, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(3, FLAG_DART_DROPPED);
 	}
 }
+void setKey3Auto()
+{
+	dm_target_angle = ROTATE_4_CHANGE_DARTS_ANGLE; // 设置目标角度为第四发位置
+	if ((fabs(rotateChageDarts->measure.position - dm_target_angle) > 0.1f) || (!DART_CHECK_MASK(3, MASK_READY_TO_LOAD)))
+	{
+		key3_start_tick = 0;
+		return;
+	}
 
+	if (key3_start_tick == 0) {
+		key3_start_tick = HAL_GetTick();
+		if(key3_start_tick == 0) key3_start_tick = 1;
+	}
+
+	uint32_t dt = HAL_GetTick() - key3_start_tick;
+
+	if (dt < 1000) {
+		ServoSetAngle(gripper1_motor, GRIPPER_3_LAY_ANGLE);
+		relay_control(2, 0);
+	}
+	else if (dt < 1500) {
+		ServoSetAngle(gripper1_motor, GRIPPER_3_LAY_ANGLE);
+		relay_control(2, 1);
+	}
+	else if (dt < 3500) {
+		ServoSetAngle(gripper1_motor, GRIPPER_3_NORMAL_ANGLE);
+		relay_control(2, 1);
+	}
+	else {
+		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(2, 0);
+		DART_SET_BIT(3, FLAG_ARM_ANGLE_READY);
+		DART_SET_BIT(3, FLAG_DART_DROPPED);
+	}
+}
 int initServoMagnet = 0;
 int initRotate = 0;
 
@@ -701,6 +804,7 @@ int start_1_time = 0;
 int start_2_time = 0;
 int start_3_time = 0;
 int tmpb = 0;
+extern int i;
 /* 机器人发射机构控制核心任务 */
 void ShootTask()
 {
@@ -725,7 +829,7 @@ void ShootTask()
 	}
 	// ServoSetAngle(gripper3_motor,1.0f);
 	// BanjiServoStepTest(); // 调用舵机阶梯测试函数
-	// ServoStepTest(gripper2_motor);
+	// ServoStepTest(gripper3_motor);
 	// relay_control(1, 0);
 	// relay_control(2, 1);
 	// relay_control(3, 0);
@@ -871,72 +975,76 @@ void ShootTask()
 		DMMotorEnable(rotateChageDarts);
 		DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
 		int cur = DartSys.currentStep;
-
+		// if(cur == 0){
+		// 	DartSys.currentStep = 1;
+		// }
 		//这是第一发飞镖的测试逻辑
 		if(tmpa==1) {
 			break;
 		}
-		DART_SET_BIT(0, FLAG_DART_DROPPED); 
-		if (!DART_CHECK_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS)) {
-			DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
-			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
-				DART_SET_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS);
+		switch (cur) {
+			case 0:
+			{
+				DART_SET_BIT(0, FLAG_DART_DROPPED); 
+				if (!DART_CHECK_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS)) {
+					DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+						DART_SET_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS);
+					}
+					break;
+				}
+				if (DART_CHECK_MASK(0, MASK_READY_TO_FIRE)) {
+					// 扳机打开，发射飞镖
+					tmpb=1;
+					if(start_0_time == 0) {
+						start_0_time = HAL_GetTick();
+					}
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+					uint32_t dt = HAL_GetTick() - start_0_time;
+					if(dt < 1000) {
+						break; // 延时200ms确保扳机打开
+					}
+					tmpb=2;
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
+					DART_SET_BIT(0, FLAG_FIRED);
+					i=0;
+					DartSys.currentStep++;
+				}
+				break;
 			}
-			break;
-		}
-		if (DART_CHECK_MASK(0, MASK_READY_TO_FIRE)) {
-			// 扳机打开，发射飞镖
-			tmpb=1;
-			if(start_0_time == 0) {
-				start_0_time = HAL_GetTick();
+			case 1:
+			{
+				setKey1Auto();
+				if(!DART_CHECK_BIT(1,FLAG_DART_DROPPED))
+					break;
+				if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS)) {
+					DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+						DART_SET_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS);
+					}
+					break;
+				}
+				if (DART_CHECK_MASK(1, MASK_READY_TO_FIRE)) {
+					// 扳机打开，发射飞镖
+					tmpb=1;
+					if(start_1_time == 0) {
+						start_1_time = HAL_GetTick();
+					}
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+					uint32_t dt = HAL_GetTick() - start_1_time;
+					if(dt < 1000) {
+						break; // 延时200ms确保扳机打开
+					}
+					tmpb=2;
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
+					DART_SET_BIT(1, FLAG_FIRED);
+					i=0;
+					tmpa=1;
+				}
+				break;
 			}
-			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
-			uint32_t dt = HAL_GetTick() - start_0_time;
-			if(dt < 1000) {
-				break; // 延时200ms确保扳机打开
-			}
-			tmpb=2;
-			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
-			DART_SET_BIT(0, FLAG_FIRED);
-			DartSys.currentStep++;
-		}
-
-		/*第二发飞镖的测试逻辑*/
-		if(!DART_CHECK_BIT(0, FLAG_FIRED)) {
-			break;
-		}
-		if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_LOAD_POS)) {
-			DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_POS);
-			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_POS,RELOAD_TRIGGER_DEADBAND)) {// 到达位置后设置标志位
-				DART_SET_BIT(1, FLAG_TRIGGER_AT_LOAD_POS);
-			}
-			break;
-		}
-		setKey1();
-		if(!DART_CHECK_BIT(1,FLAG_DART_DROPPED))
-			break;
-		if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS)) {
-			DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
-			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
-				DART_SET_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS);
-			}
-			break;
-		}
-		if (DART_CHECK_MASK(1, MASK_READY_TO_FIRE)) {
-			// 扳机打开，发射飞镖
-			tmpb=1;
-			if(start_1_time == 0) {
-				start_1_time = HAL_GetTick();
-			}
-			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
-			uint32_t dt = HAL_GetTick() - start_1_time;
-			if(dt < 1000) {
-				break; // 延时200ms确保扳机打开
-			}
-			tmpb=2;
-			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
-			DART_SET_BIT(1, FLAG_FIRED);
-			tmpa=1;
+			default:
+				break;
 		}
 		// 这是整个流程的 auto
 		// {

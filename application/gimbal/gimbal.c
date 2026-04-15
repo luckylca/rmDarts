@@ -33,15 +33,15 @@ void GimbalInit()
             {
                 .angle_PID =
                     {
-                        .Kp = 20, // 10
-                        .Ki = 0,
-                        .Kd = 1,
+                        .Kp = 0, // 10
+                        .Ki = 0,//0
+                        .Kd = 0,//1
                         .MaxOut = 500000,
                     },
                 .speed_PID =
                     {
-                        .Kp = 15, // 10
-                        .Ki = 1,  // 1
+                        .Kp = 0, // 15
+                        .Ki = 0,  // 1
                         .Kd = 0,
                         .Improve = PID_Integral_Limit,
                         .IntegralLimit = 5000,
@@ -49,8 +49,8 @@ void GimbalInit()
                     },
                 .current_PID =
                     {
-                        .Kp = 0.5, // 0.7
-                        .Ki = 0.1, // 0.1
+                        .Kp = 0, // 0.5
+                        .Ki = 0, // 0.1
                         .Kd = 0,
                         .Improve = PID_Integral_Limit,
                         .IntegralLimit = 5000,
@@ -76,7 +76,7 @@ void GimbalInit()
 		.type = DJI_MOTOR,
 		.data.dji = yaw_motor,
 	};
-	motorRecoderRegister(&recoder_init_config);
+	// motorRecoderRegister(&recoder_init_config);
 
     SPI_Init_Config_s encoder_spi_config = {
         .spi_handle = &hspi2,
@@ -100,8 +100,8 @@ void GimbalTask()
     switch (gimbal_cmd_recv.gimbal_mode)
     {
     case GIMBAL_ZERO_FORCE:
-        DJIMotorOuterLoop(yaw_motor, SPEED_LOOP);
-        DJIMotorSetRef(yaw_motor, 0);
+        // DJIMotorOuterLoop(yaw_motor, SPEED_LOOP);
+        // DJIMotorSetRef(yaw_motor, 0);
         DJIMotorStop(yaw_motor);
         break;
     case GIMBAL_TEST:
@@ -110,6 +110,9 @@ void GimbalTask()
         DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw); 
         break;
     case AUTO_DART:
+        DJIMotorEnable(yaw_motor);
+        DJIMotorOuterLoop(yaw_motor, ANGLE_LOOP);
+        DART_SET_BIT(0, FLAG_GIMBAL_AIMED);
         DART_SET_BIT(1, FLAG_GIMBAL_AIMED);
         DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw);
         // 第一发镖

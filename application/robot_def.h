@@ -36,33 +36,38 @@
 #define BANJI_OPEN_ANGLE 0.098f    // 扳机舵机打开角度
 #define BANJI_CLOSE_ANGLE 0.082f // 扳机舵机关闭角度
 #define GRIPPER_CLOSE_ANGLE 0.000f // 扳机舵机发射角度
-#define GRIPPER_1_LAY_ANGLE 0.125f // 夹爪放置角度
-#define GRIPPER_1_NORMAL_ANGLE 0.070f // 夹爪正常角度
+#define GRIPPER_1_LAY_ANGLE 0.133f // 夹爪放置角度
+#define GRIPPER_1_NORMAL_ANGLE 0.075f // 夹爪正常角度
 #define GRIPPER_2_LAY_ANGLE 0.120f // 夹爪放置角度
-#define GRIPPER_2_NORMAL_ANGLE 0.0850f // 夹爪正常角度
-#define GRIPPER_3_LAY_ANGLE 0.050f // 夹爪放置角度
-#define GRIPPER_3_NORMAL_ANGLE 0.015f // 夹爪正常角度
+#define GRIPPER_2_NORMAL_ANGLE 0.0650f // 夹爪正常角度
+#define GRIPPER_3_LAY_ANGLE 0.065f // 夹爪放置角度
+#define GRIPPER_3_NORMAL_ANGLE 0.030f // 夹爪正常角度
 
 #define LF_CHASSIS_3508_LOAD_ANGLE -38000.0f // 3508蓄力到位角度
 #define RF_CHASSIS_3508_LOAD_ANGLE 38000.0f // 3508蓄力到位角度
-#define LF_CHASSIS_3508_REBOUND_ANGLE 7300.0f // 3508反弹到位角度 
-#define RF_CHASSIS_3508_REBOUND_ANGLE -7300.0f // 3508反弹到位角度
+#define LF_CHASSIS_3508_REBOUND_ANGLE 5500.0f // 3508反弹到位角度 
+#define RF_CHASSIS_3508_REBOUND_ANGLE -5500.0f // 3508反弹到位角度
 
-#define RELOAD_TRIGGER_POS 670000.0f
+#define RELOAD_TRIGGER_POS 20000.0f
 #define RELOAD_TRIGGER_DEADBAND 100.0f
 
 #define ROTATE_1_CHANGE_DARTS_ANGLE 0.0f    // 旋转换弹第一发电机绝对位置,也就是初始值
-#define ROTATE_2_CHANGE_DARTS_ANGLE -1.129f // 旋转换弹第二发电机绝对位置
-#define ROTATE_3_CHANGE_DARTS_ANGLE -3.1855 // 旋转换弹第三发电机绝对位置 0。9046
+#define ROTATE_2_CHANGE_DARTS_ANGLE -1.126f // 旋转换弹第二发电机绝对位置
+#define ROTATE_3_CHANGE_DARTS_ANGLE -3.180f // 旋转换弹第三发电机绝对位置 0。9046
 #define ROTATE_4_CHANGE_DARTS_ANGLE -5.305f // 旋转换弹第四发电机绝对位置3。00
 
 #define ENCODER_LEFT_LIMIT  0x400     // 左边encoder限位值
 #define ENCODER_RIGHT_LIMIT 0x4b2    // 右边encoder限位值
 
-#define YELLOW_25M_SHOOT_ANGLE 485246.7f // 黄色25m发射位置
-#define GREEN_25M_SHOOT_ANGLE 485246.7f //  绿色25m发射位置
-#define BLUE_25M_SHOOT_ANGLE 485246.7f //  蓝色25m发射位置
-#define PURPLE_25M_SHOOT_ANGLE 485246.7f // 紫色25m发射位置
+// #define YELLOW_25M_SHOOT_ANGLE -385246.7f // 黄色25m发射位置
+// #define GREEN_25M_SHOOT_ANGLE -385246.7f //  绿色25m发射位置
+// #define BLUE_25M_SHOOT_ANGLE -385246.7f //  蓝色25m发射位置
+// #define PURPLE_25M_SHOOT_ANGLE -385246.7f // 紫色25m发射位置
+
+#define YELLOW_25M_SHOOT_ANGLE -1031000.7f // 黄色25m发射位置
+#define GREEN_25M_SHOOT_ANGLE -1031000.7f //  绿色25m发射位置
+#define BLUE_25M_SHOOT_ANGLE -1031000.7f //  蓝色25m发射位置
+#define PURPLE_25M_SHOOT_ANGLE -1031000.7f // 紫色25m发射位置
 
 #define YELLOW_25M_YAW_ANGLE -41317.6f // 黄色25m发射位置
 #define GREEN_25M_YAW_ANGLE 15584.0f //  绿色25m发射位置

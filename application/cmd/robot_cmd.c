@@ -183,7 +183,6 @@ static void CalcOffsetAngle()
 {
 
 }
-int i = 0;
 /**
  * @brief 控制输入为遥控器(调试时)的模式和控制量设置
  *

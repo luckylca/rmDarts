@@ -13,6 +13,8 @@
 #include "at24c02.h"
 #include "cmsis_os.h"
 #include "bsp_log.h"
+#include "referee_protocol.h"
+#include "rm_referee.h"
 
 #define DEAD_LINE_LOAD 20
 static DJIMotorInstance *chargeLoader;	  // 蓄力丝杆
@@ -27,6 +29,8 @@ static Publisher_t *shoot_pub;
 static Shoot_Ctrl_Cmd_s shoot_cmd_recv; // 来自cmd的发射控制信息
 static Subscriber_t *shoot_sub;
 static Shoot_Upload_Data_s shoot_feedback_data; // 来自cmd的发射控制信息
+
+extern referee_info_t* referee_info;
 
 // dwt定时,计算冷却用
 static float hibernate_time = 0, dead_time = 10;
@@ -975,10 +979,11 @@ void ShootTask()
 		DMMotorEnable(rotateChageDarts);
 		DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
 		int cur = DartSys.currentStep;
-		// if(cur == 0){
-		// 	DartSys.currentStep = 1;
-		// }
-		//这是第一发飞镖的测试逻辑
+		#ifdef REFEREE
+			//1是关闭，2 是正在开启，0 是已经开启
+			if(referee_info->DartCmd.dart_launch_opening_status == 1)
+				break;
+		#endif
 		if(tmpa==1) {
 			break;
 		}
@@ -1018,15 +1023,14 @@ void ShootTask()
 				if(!DART_CHECK_BIT(1,FLAG_DART_DROPPED))
 					break;
 				if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS)) {
-					DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
-					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+					DJIMotorSetRef(chargeLoader, GREEN_25M_SHOOT_ANGLE);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, GREEN_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
 						DART_SET_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS);
 					}
 					break;
 				}
 				if (DART_CHECK_MASK(1, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
-					tmpb=1;
 					if(start_1_time == 0) {
 						start_1_time = HAL_GetTick();
 					}
@@ -1035,153 +1039,75 @@ void ShootTask()
 					if(dt < 1000) {
 						break; // 延时200ms确保扳机打开
 					}
-					tmpb=2;
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
 					DART_SET_BIT(1, FLAG_FIRED);
 					i=0;
-					tmpa=1;
+					DartSys.currentStep++;
 				}
+				break;
+			}
+			case 2:
+			{
+				setKey2Auto();
+				if(!DART_CHECK_BIT(2,FLAG_DART_DROPPED))
+					break;
+				if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS)) {
+					DJIMotorSetRef(chargeLoader, BLUE_25M_SHOOT_ANGLE);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, BLUE_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+						DART_SET_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS);
+					}
+					break;
+				}
+				if (DART_CHECK_MASK(2, MASK_READY_TO_FIRE)) {
+					// 扳机打开，发射飞镖
+					if(start_2_time == 0) {
+						start_2_time = HAL_GetTick();
+					}
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+					uint32_t dt = HAL_GetTick() - start_2_time;
+					if(dt < 1000) {
+						break; // 延时200ms确保扳机打开
+					}
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
+					DART_SET_BIT(2, FLAG_FIRED);
+					i=0;
+					DartSys.currentStep++;
+				}
+				break;
+			}
+			case 3:
+			{
+				setKey3Auto();
+				if(!DART_CHECK_BIT(3,FLAG_DART_DROPPED))
+					break;
+				if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS)) {
+					DJIMotorSetRef(chargeLoader, PURPLE_25M_SHOOT_ANGLE);
+					if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, PURPLE_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
+						DART_SET_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS);
+					}
+					break;
+				}
+				if (DART_CHECK_MASK(3, MASK_READY_TO_FIRE)) {
+					// 扳机打开，发射飞镖
+					if(start_3_time == 0) {
+						start_3_time = HAL_GetTick();
+					}
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+					uint32_t dt = HAL_GetTick() - start_3_time;
+					if(dt < 1000) {
+						break; // 延时200ms确保扳机打开
+					}
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
+					DART_SET_BIT(3, FLAG_FIRED);
+					i=0;
+					DartSys.currentStep++;
+				}
+				tmpa=1;
 				break;
 			}
 			default:
 				break;
 		}
-		// 这是整个流程的 auto
-		// {
-		// 	DJIMotorEnable(chargeLoader);
-		// 	DMMotorEnable(rotateChageDarts);
-		// 	DJIMotorOuterLoop(cha                         rgeLoader, ANGLE_LOOP);
-		// 	uint8_t cur = DartSys.currentStep; 
-		// 	if (cur >= 4) return;
-		// 	if (cur == 0) {
-		// 		DART_SET_BIT(0, FLAG_DART_DROPPED); 
-		// 		if (!DART_CHECK_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS)) {
-		// 			DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
-		// 			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE,MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
-		// 				DART_SET_BIT(0, FLAG_TRIGGER_AT_SHOOT_POS);
-		// 			}
-		// 			return;
-		// 		}
-		// 		if (DART_CHECK_MASK(0, MASK_READY_TO_FIRE)) {
-		// 			// 扳机打开，发射飞镖
-		// 			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-		// 			osDelay(1000); // 延时200ms确保扳机打开
-		// 			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
-		// 			DART_SET_BIT(0, FLAG_FIRED);
-		// 		}
-		// 		if (DART_CHECK_BIT(0, FLAG_FIRED)) {
-		// 			DartSys.currentStep++;
-		// 		}
-		// 		return;
-		// 	}
-
-		// 	// 第二发镖
-		// 	if (cur == 1) {
-		// 		if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_LOAD_POS)) {
-		// 			// 扳机移动到装弹位置
-		// 			DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_POS);
-		// 			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_POS, RELOAD_TRIGGER_DEADBAND)) {// 到达位置后设置标志位
-		// 				DART_SET_BIT(1, FLAG_TRIGGER_AT_LOAD_POS);
-		// 			}
-		// 		}
-		// 		if (DART_CHECK_MASK(1, MASK_READY_TO_LOAD)) {
-		// 			setKey1(); // 关闭电磁铁，放下飞镖
-		// 		}
-		// 		if(!DART_CHECK_MASK(1, MASK_READY_TO_SHOOT)) {
-		// 			return;
-		// 		}
-		// 		if (!DART_CHECK_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS)) {
-		// 			// 扳机移动到发射位置
-		// 			DJIMotorSetRef(chargeLoader, YELLOW_25M_SHOOT_ANGLE);
-		// 			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, YELLOW_25M_SHOOT_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
-		// 				DART_SET_BIT(1, FLAG_TRIGGER_AT_SHOOT_POS);
-		// 			}
-		// 		}
-		// 		if (DART_CHECK_MASK(1, MASK_READY_TO_FIRE)) {
-		// 			// 扳机打开，发射飞镖
-		// 			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-		// 			osDelay(2); // 延时2ms确保扳机打开
-		// 			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
-		// 			DART_SET_BIT(1, FLAG_FIRED);
-		// 		}
-		// 		if (DART_CHECK_BIT(1, FLAG_FIRED)) {
-		// 			DartSys.currentStep++;
-		// 		}
-		// 		return;
-		// 	}
-
-		// 	// 第三发镖
-		// 	if (cur == 2) {
-		// 		if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_LOAD_POS)) {
-		// 			// 扳机移动到装弹位置
-		// 			DJIMotorSetRef(chargeLoader, GREEN_25M_SHOOT_ANGLE);
-		// 			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, GREEN_25M_SHOOT_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
-		// 				DART_SET_BIT(2, FLAG_TRIGGER_AT_LOAD_POS);
-		// 			}
-		// 		}
-		// 		DART_SET_BIT(2, FLAG_RELOAD_ROTATED);
-		// 		if (DART_CHECK_MASK(2, MASK_READY_TO_LOAD)) {
-		// 			setKey2();
-		// 		}
-		// 		if(!DART_CHECK_MASK(2, MASK_READY_TO_SHOOT)) {
-		// 			return;
-		// 		}
-		// 		if (!DART_CHECK_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS)) {
-		// 			// 扳机移动到发射位置
-		// 			DJIMotorSetRef(chargeLoader, BLUE_25M_SHOOT_ANGLE);
-		// 			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, BLUE_25M_SHOOT_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
-		// 				DART_SET_BIT(2, FLAG_TRIGGER_AT_SHOOT_POS);
-		// 			}
-		// 		}
-		// 		if (DART_CHECK_MASK(2, MASK_READY_TO_FIRE)) {
-		// 			// 扳机打开，发射飞镖
-		// 			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-		// 			osDelay(2); // 延时2ms确保扳机打开
-		// 			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
-		// 			DART_SET_BIT(2, FLAG_FIRED);
-		// 		}
-		// 		if (DART_CHECK_BIT(2, FLAG_FIRED)) {
-		// 			DartSys.currentStep++;
-		// 		}
-		// 		return;
-		// 	}
-
-		// 	// 第四发镖
-		// 	if (cur == 3) {
-		// 		if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_LOAD_POS)) {
-		// 			// 扳机移动到装弹位置
-		// 			DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_POS);
-		// 			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_POS, RELOAD_TRIGGER_DEADBAND)) {// 到达位置后设置标志位
-		// 				DART_SET_BIT(3, FLAG_TRIGGER_AT_LOAD_POS);
-		// 			}
-		// 		}
-		// 		DART_SET_BIT(3, FLAG_RELOAD_ROTATED);
-		// 		if (DART_CHECK_MASK(3, MASK_READY_TO_LOAD)) {
-		// 			setKey3();
-		// 		}
-		// 		if(!DART_CHECK_MASK(3, MASK_READY_TO_SHOOT)) {
-		// 			return;
-		// 		}
-		// 		if (!DART_CHECK_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS)) {
-		// 			// 扳机移动到发射位置
-		// 			DJIMotorSetRef(chargeLoader, PURPLE_25M_SHOOT_ANGLE);
-		// 			if(CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, PURPLE_25M_SHOOT_ANGLE, MOTOR_ANGLE_DEADBAND)) {// 到达位置后设置标志位
-		// 				DART_SET_BIT(3, FLAG_TRIGGER_AT_SHOOT_POS);
-		// 			}
-		// 		}
-		// 		if (DART_CHECK_MASK(3, MASK_READY_TO_FIRE)) {
-		// 			// 扳机打开，发射飞镖
-		// 			ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE);
-		// 			osDelay(2); // 延时2ms确保扳机打开
-		// 			ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE); // 关闭
-		// 			DART_SET_BIT(3, FLAG_FIRED);
-		// 		}
-		// 		if (DART_CHECK_BIT(3, FLAG_FIRED)) {
-		// 			DartSys.currentStep++;
-		// 		}
-		// 		return;
-		// 	}
-		// }
 		break;
 	default:
 		break;

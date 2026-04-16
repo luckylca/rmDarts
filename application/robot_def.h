@@ -30,11 +30,13 @@
 #define VISION_USE_VCP  // 使用虚拟串口发送视觉数据
 //#define VISION_USE_UART // 使用串口发送视觉数据
 
-#define VIRSION // 使用视觉数据进行辅助瞄准
+// #define VIRSION // 使用视觉数据进行辅助瞄准
+// #define REFEREE //接入裁判系统
+
 /* 机器人重要参数定义,注意根据不同机器人进行修改,浮点数需要以.0或f结尾,无符号以u结尾 */
 
 #define BANJI_OPEN_ANGLE 0.098f    // 扳机舵机打开角度
-#define BANJI_CLOSE_ANGLE 0.082f // 扳机舵机关闭角度
+#define BANJI_CLOSE_ANGLE 0.083f // 扳机舵机关闭角度
 #define GRIPPER_CLOSE_ANGLE 0.000f // 扳机舵机发射角度
 #define GRIPPER_1_LAY_ANGLE 0.133f // 夹爪放置角度
 #define GRIPPER_1_NORMAL_ANGLE 0.075f // 夹爪正常角度

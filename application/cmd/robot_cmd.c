@@ -394,7 +394,7 @@ static void RemoteControl_outline_ALARM()
 }
 
 static void EmergencyHandler()
-{   
+{
     // uint8_t remote_online = 1;
     // uint16_t switch_right = RC_SW_DOWN;
 

@@ -8,6 +8,7 @@
 #include "robot_cmd.h"
 #include "robot_def.h"
 #include "servo_motor.h"
+#include <math.h>
 #include <stdbool.h>
 #include "status.h"
 #include "at24c02.h"
@@ -78,6 +79,7 @@ extern int flag_3508_max;
 #define dartNoExistLength 0
 #define DM_STEP_VAL 0.0157f          // 最大速度: 180度/秒
 #define DM_ACCEL_VAL 0.000157f       // 加速度: 每周期增加0.000157 rad
+#define DM_STOP_EPSILON 0.0025f      // 到位后直接锁定目标，避免末端抖动
 #define ROTATE_POWERON_SOFTSTART_MS 700U
 #define ROTATE_POWERON_KP_MIN_RATIO 0.0f
 #define ROTATE_POWERON_KD_MIN_RATIO 0.0f
@@ -163,7 +165,6 @@ static float calculateTff()
     return tff;
 }
 static float rotate_current_speed = 0; // 当前速度
-static uint8_t rotate_ramp_done = 0;   // 加速阶段完成标志
 
 static void rotateSlowMove(void)
 {
@@ -172,47 +173,46 @@ static void rotateSlowMove(void)
 	if (rotateChageDarts->stop_flag == MOTOR_STOP) {
 		dm_current_setpoint = rotateChageDarts->measure.position;
 		rotate_current_speed = 0;
-		rotate_ramp_done = 0;
 		return;
 	}
 
-	// 1. 计算目标与当前的差值
 	float diff = dm_target_angle - dm_current_setpoint;
-	float abs_diff = fabs(diff);
+	float abs_diff = fabsf(diff);
 
-	// 2. 梯形速度控制
-	if (!rotate_ramp_done) {
-		// 加速阶段
-		rotate_current_speed += DM_ACCEL_VAL;
-		if (rotate_current_speed >= DM_STEP_VAL) {
-			rotate_current_speed = DM_STEP_VAL;
-			rotate_ramp_done = 1;
-		}
-	}
-
-	// 3. 减速阶段判断 - 当剩余距离小于减速距离时开始减速
-	// 减速距离 ≈ v²/(2a)，简化处理使用固定比例
-	float deceleration_threshold = rotate_current_speed * rotate_current_speed / (2.0f * DM_ACCEL_VAL * 10.0f);
-	if (abs_diff < deceleration_threshold && rotate_ramp_done) {
-		// 进入减速阶段
-		rotate_current_speed -= DM_ACCEL_VAL;
-		if (rotate_current_speed < DM_ACCEL_VAL * 2.0f) {
-			rotate_current_speed = DM_ACCEL_VAL * 2.0f; // 保持最小速度
-		}
-	}
-
-	// 4. 根据当前速度和方向移动
-	if (abs_diff > rotate_current_speed) {
-		if (diff > 0) {
-			dm_current_setpoint += rotate_current_speed;
-		} else {
-			dm_current_setpoint -= rotate_current_speed;
-		}
-	} else {
-		// 到达目标
+	if (abs_diff <= DM_STOP_EPSILON) {
 		dm_current_setpoint = dm_target_angle;
 		rotate_current_speed = 0;
-		rotate_ramp_done = 0;
+		DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff());
+		return;
+	}
+
+	float target_speed = sqrtf(2.0f * DM_ACCEL_VAL * abs_diff);
+	if (target_speed > DM_STEP_VAL) {
+		target_speed = DM_STEP_VAL;
+	}
+
+	if (rotate_current_speed < target_speed) {
+		rotate_current_speed += DM_ACCEL_VAL;
+		if (rotate_current_speed > target_speed) {
+			rotate_current_speed = target_speed;
+		}
+	} else {
+		rotate_current_speed -= DM_ACCEL_VAL;
+		if (rotate_current_speed < target_speed) {
+			rotate_current_speed = target_speed;
+		}
+	}
+
+	if (diff > 0.0f) {
+		dm_current_setpoint += rotate_current_speed;
+		if (dm_current_setpoint > dm_target_angle) {
+			dm_current_setpoint = dm_target_angle;
+		}
+	} else {
+		dm_current_setpoint -= rotate_current_speed;
+		if (dm_current_setpoint < dm_target_angle) {
+			dm_current_setpoint = dm_target_angle;
+		}
 	}
 
 	DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff());
@@ -837,7 +837,7 @@ void ShootTask()
 	// relay_control(1, 0);
 	// relay_control(2, 1);
 	// relay_control(3, 0);
-
+	relay_control(3, 1);
 	rotateSlowMove();
 	switch (shoot_cmd_recv.shoot_mode)
 	{
@@ -851,6 +851,7 @@ void ShootTask()
 	case SHOOT_TEST:
 		DJIMotorEnable(chargeLoader);
 		DMMotorEnable(rotateChageDarts);
+		/*
 		{
 			cmd = shoot_cmd_recv.GripperTest;
 			if (cmd != last_gripper_cmd)
@@ -907,6 +908,7 @@ void ShootTask()
 				break;
 			}
 		}
+		*/
 		switch (shoot_cmd_recv.banji_mode)
 		{
 		case BANJI_ON:
@@ -923,26 +925,27 @@ void ShootTask()
 		switch (shoot_cmd_recv.load_mode)
 		{
 		case LOAD_STOP:
-			if (hold_loader_after_reload)
-			{
-				DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-				DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
-			}
-			else
-			{
-				DJIMotorOuterLoop(chargeLoader, SPEED_LOOP); // 切换到速度环
-				DJIMotorSetRef(chargeLoader, 0);			 // 同时设定
-			}
+			// if (hold_loader_after_reload)
+			// {
+			// 	DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
+			// 	DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
+			// }
+			// else
+			// {
+			// 	DJIMotorOuterLoop(chargeLoader, SPEED_LOOP); // 切换到速度环
+			// 	DJIMotorSetRef(chargeLoader, 0);			 // 同时设定
+			// }
+			DJIMotorStop(chargeLoader);
 			break;
 		case LOADER_TEST:
 			DJIMotorEnable(chargeLoader);
 			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
 			// DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
-			// DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
-			if(hold_loader_after_reload)
-				DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
-			else
-				DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
+			DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
+			// if(hold_loader_after_reload)
+			// 	DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
+			// else
+			// 	DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
 			break;
 		case AUTO_LOAD:
 			/* code */
@@ -956,15 +959,16 @@ void ShootTask()
 			DMMotorStop(rotateChageDarts);
 			break;
 		case ROTATE_TEST:
-			if (hold_rotate_after_reload)
-			{
-				dm_target_angle = getCurrentAngel(cmd);
-			}
-			else
-			{
-				dm_target_angle = shoot_cmd_recv.rotate_rate;
-			}
-			//力矩正方向是面对镖架的顺时针
+			// if (hold_rotate_after_reload)
+			// {
+			// 	dm_target_angle = getCurrentAngel(cmd);
+			// }
+			// else
+			// {
+			// 	dm_target_angle = shoot_cmd_recv.rotate_rate;
+			// }
+			// //力矩正方向是面对镖架的顺时针
+			dm_target_angle = shoot_cmd_recv.rotate_rate;
 			// DMMotorSetRef(rotateChageDarts, shoot_cmd_recv.rotate_rate, calculateTff());
 			break;
 		case ROTATE_AUTO:
@@ -972,6 +976,20 @@ void ShootTask()
 			break;
 		default:
 			break;
+		}
+		switch (shoot_cmd_recv.GripperTest)
+		{
+			case 1:
+				setKey1();
+				break;
+			case 2:
+				setKey2();
+				break;
+			case 3:
+				setKey3();
+				break;
+			default:
+				break;
 		}
 		break;
 	case SHOOT_AUTO:

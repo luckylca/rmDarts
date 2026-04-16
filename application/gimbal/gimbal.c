@@ -96,7 +96,7 @@ void GimbalTask()
 {
 
     SubGetMessage(gimbal_sub, &gimbal_cmd_recv);
-    VisionSetAngle(encoder->measure.angle);
+    // VisionSetAngle(encoder->measure.angle);
     switch (gimbal_cmd_recv.gimbal_mode)
     {
     case GIMBAL_ZERO_FORCE:

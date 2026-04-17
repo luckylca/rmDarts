@@ -45,8 +45,8 @@
 #define GRIPPER_3_LAY_ANGLE 0.050f // 夹爪放置角度
 #define GRIPPER_3_NORMAL_ANGLE 0.030f // 夹爪正常角度
 
-#define LF_CHASSIS_3508_LOAD_ANGLE -38300.0f // 3508蓄力到位角度
-#define RF_CHASSIS_3508_LOAD_ANGLE 38300.0f // 3508蓄力到位角度
+#define LF_CHASSIS_3508_LOAD_ANGLE -38500.0f // 3508蓄力到位角度
+#define RF_CHASSIS_3508_LOAD_ANGLE 38500.0f // 3508蓄力到位角度
 #define LF_CHASSIS_3508_REBOUND_ANGLE 4400.0f // 3508反弹到位角度 
 #define RF_CHASSIS_3508_REBOUND_ANGLE -4400.0f // 3508反弹到位角度
 
@@ -66,10 +66,10 @@
 // #define BLUE_25M_SHOOT_ANGLE -385246.7f //  蓝色25m发射位置
 // #define PURPLE_25M_SHOOT_ANGLE -385246.7f // 紫色25m发射位置
 
-#define YELLOW_25M_SHOOT_ANGLE -120000.7f // 黄色25m发射位置
-#define GREEN_25M_SHOOT_ANGLE -120000.7f //  绿色25m发射位置
-#define BLUE_25M_SHOOT_ANGLE -120000.7f //  蓝色25m发射位置
-#define PURPLE_25M_SHOOT_ANGLE -120000.7f // 紫色25m发射位置
+#define YELLOW_25M_SHOOT_ANGLE -115000.7f // 黄色25m发射位置
+#define GREEN_25M_SHOOT_ANGLE -105000.7f //  绿色25m发射位置
+#define BLUE_25M_SHOOT_ANGLE -95000.7f //  蓝色25m发射位置
+#define PURPLE_25M_SHOOT_ANGLE -85000.7f // 紫色25m发射位置
 
 #define YELLOW_25M_YAW_ANGLE -41317.6f // 黄色25m发射位置
 #define GREEN_25M_YAW_ANGLE 15584.0f //  绿色25m发射位置

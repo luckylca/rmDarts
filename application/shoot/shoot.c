@@ -997,6 +997,8 @@ void ShootTask()
 		DMMotorEnable(rotateChageDarts);
 		DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
 		int cur = DartSys.currentStep;
+		// if(cur==0)
+		// 	DartSys.currentStep+=3;
 		#ifdef REFEREE
 			//1是关闭，2 是正在开启，0 是已经开启
 			if(referee_info->DartCmd.dart_launch_opening_status == 1)
@@ -1024,7 +1026,7 @@ void ShootTask()
 					}
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
 					uint32_t dt = HAL_GetTick() - start_0_time;
-					if(dt < 1000) {
+					if(dt < 1500) {
 						break; // 延时200ms确保扳机打开
 					}
 					tmpb=2;
@@ -1054,7 +1056,7 @@ void ShootTask()
 					}
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
 					uint32_t dt = HAL_GetTick() - start_1_time;
-					if(dt < 1000) {
+					if(dt < 1500) {
 						break; // 延时200ms确保扳机打开
 					}
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
@@ -1083,7 +1085,7 @@ void ShootTask()
 					}
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
 					uint32_t dt = HAL_GetTick() - start_2_time;
-					if(dt < 1000) {
+					if(dt < 1500) {
 						break; // 延时200ms确保扳机打开
 					}
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
@@ -1112,7 +1114,7 @@ void ShootTask()
 					}
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
 					uint32_t dt = HAL_GetTick() - start_3_time;
-					if(dt < 1000) {
+					if(dt < 1500) {
 						break; // 延时200ms确保扳机打开
 					}
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
@@ -1120,7 +1122,6 @@ void ShootTask()
 					i=0;
 					DartSys.currentStep++;
 				}
-				tmpa=1;
 				break;
 			}
 			default:

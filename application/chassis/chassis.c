@@ -101,7 +101,7 @@ extern int key;
 #define SPEED_3508 -4000
 
 // 速度环位置控制参数：远距离高速，近距离自动降速
-#define CHASSIS_3508_MAX_SPEED_CMD 20000.0f//通过这个控制整体速度，原来是 20000.0f
+#define CHASSIS_3508_MAX_SPEED_CMD 15000.0f//通过这个控制整体速度，原来是 20000.0f
 #define CHASSIS_3508_MIN_SPEED_CMD 9000.0f
 #define CHASSIS_3508_HOLD_SPEED_CMD 3500.0f
 #define CHASSIS_3508_POS2SPEED_KP 0.75f

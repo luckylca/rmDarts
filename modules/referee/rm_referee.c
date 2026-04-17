@@ -74,7 +74,7 @@ static void JudgeReadData(uint8_t *buff)
 
 				case ID_dart_info: // 0x0105
 					memcpy(&referee_info.DartInfo, (buff + DATA_Offset), LEN_dart_info);
-
+					break;
 				case ID_game_robot_state: // 0x0201
 					memcpy(&referee_info.GameRobotState, (buff + DATA_Offset), LEN_game_robot_state);
 					break;

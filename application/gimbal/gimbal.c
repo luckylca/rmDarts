@@ -33,28 +33,28 @@ void GimbalInit()
             {
                 .angle_PID =
                     {
-                        .Kp = 0, // 10
+                        .Kp = 5, // 10
                         .Ki = 0,//0
                         .Kd = 0,//1
                         .MaxOut = 500000,
                     },
                 .speed_PID =
                     {
-                        .Kp = 0, // 15
+                        .Kp = 5, // 15
                         .Ki = 0,  // 1
                         .Kd = 0,
                         .Improve = PID_Integral_Limit,
-                        .IntegralLimit = 5000,
-                        .MaxOut = 5000,
+                        .IntegralLimit = 600,
+                        .MaxOut = 2000,
                     },
                 .current_PID =
                     {
-                        .Kp = 0, // 0.5
-                        .Ki = 0, // 0.1
+                        .Kp = 0.5, // 0.5
+                        .Ki = 0.1, // 0.1
                         .Kd = 0,
                         .Improve = PID_Integral_Limit,
-                        .IntegralLimit = 5000,
-                        .MaxOut = 5000,
+                        .IntegralLimit = 300,
+                        .MaxOut = 800,
                     },
             },
         .controller_setting_init_config =
@@ -114,6 +114,8 @@ void GimbalTask()
         DJIMotorOuterLoop(yaw_motor, ANGLE_LOOP);
         DART_SET_BIT(0, FLAG_GIMBAL_AIMED);
         DART_SET_BIT(1, FLAG_GIMBAL_AIMED);
+        DART_SET_BIT(2, FLAG_GIMBAL_AIMED);
+        DART_SET_BIT(3, FLAG_GIMBAL_AIMED);
         DJIMotorSetRef(yaw_motor, gimbal_cmd_recv.yaw);
         break;
     default:

@@ -30,25 +30,25 @@
 #define VISION_USE_VCP  // 使用虚拟串口发送视觉数据
 //#define VISION_USE_UART // 使用串口发送视觉数据
 
-// #define VIRSION // 使用视觉数据进行辅助瞄准
+#define VIRSION // 使用视觉数据进行辅助瞄准
 // #define REFEREE //接入裁判系统
 
 /* 机器人重要参数定义,注意根据不同机器人进行修改,浮点数需要以.0或f结尾,无符号以u结尾 */
 
 #define BANJI_OPEN_ANGLE 0.098f    // 扳机舵机打开角度
-#define BANJI_CLOSE_ANGLE 0.083f // 扳机舵机关闭角度
+#define BANJI_CLOSE_ANGLE 0.080f // 扳机舵机关闭角度
 #define GRIPPER_CLOSE_ANGLE 0.000f // 扳机舵机发射角度
-#define GRIPPER_1_LAY_ANGLE 0.133f // 夹爪放置角度
+#define GRIPPER_1_LAY_ANGLE 0.109f // 夹爪放置角度
 #define GRIPPER_1_NORMAL_ANGLE 0.075f // 夹爪正常角度
-#define GRIPPER_2_LAY_ANGLE 0.120f // 夹爪放置角度
+#define GRIPPER_2_LAY_ANGLE 0.700f // 夹爪放置角度
 #define GRIPPER_2_NORMAL_ANGLE 0.0650f // 夹爪正常角度
-#define GRIPPER_3_LAY_ANGLE 0.065f // 夹爪放置角度
+#define GRIPPER_3_LAY_ANGLE 0.050f // 夹爪放置角度
 #define GRIPPER_3_NORMAL_ANGLE 0.030f // 夹爪正常角度
 
-#define LF_CHASSIS_3508_LOAD_ANGLE -38000.0f // 3508蓄力到位角度
-#define RF_CHASSIS_3508_LOAD_ANGLE 38000.0f // 3508蓄力到位角度
-#define LF_CHASSIS_3508_REBOUND_ANGLE 5500.0f // 3508反弹到位角度 
-#define RF_CHASSIS_3508_REBOUND_ANGLE -5500.0f // 3508反弹到位角度
+#define LF_CHASSIS_3508_LOAD_ANGLE -38300.0f // 3508蓄力到位角度
+#define RF_CHASSIS_3508_LOAD_ANGLE 38300.0f // 3508蓄力到位角度
+#define LF_CHASSIS_3508_REBOUND_ANGLE 4400.0f // 3508反弹到位角度 
+#define RF_CHASSIS_3508_REBOUND_ANGLE -4400.0f // 3508反弹到位角度
 
 #define RELOAD_TRIGGER_POS 20000.0f
 #define RELOAD_TRIGGER_DEADBAND 100.0f
@@ -66,10 +66,10 @@
 // #define BLUE_25M_SHOOT_ANGLE -385246.7f //  蓝色25m发射位置
 // #define PURPLE_25M_SHOOT_ANGLE -385246.7f // 紫色25m发射位置
 
-#define YELLOW_25M_SHOOT_ANGLE -1031000.7f // 黄色25m发射位置
-#define GREEN_25M_SHOOT_ANGLE -1031000.7f //  绿色25m发射位置
-#define BLUE_25M_SHOOT_ANGLE -1031000.7f //  蓝色25m发射位置
-#define PURPLE_25M_SHOOT_ANGLE -1031000.7f // 紫色25m发射位置
+#define YELLOW_25M_SHOOT_ANGLE -120000.7f // 黄色25m发射位置
+#define GREEN_25M_SHOOT_ANGLE -120000.7f //  绿色25m发射位置
+#define BLUE_25M_SHOOT_ANGLE -120000.7f //  蓝色25m发射位置
+#define PURPLE_25M_SHOOT_ANGLE -120000.7f // 紫色25m发射位置
 
 #define YELLOW_25M_YAW_ANGLE -41317.6f // 黄色25m发射位置
 #define GREEN_25M_YAW_ANGLE 15584.0f //  绿色25m发射位置

@@ -41,7 +41,8 @@ static Subscriber_t *chassis_sub;                   // 用于订阅底盘的控�
 static Chassis_Ctrl_Cmd_s chassis_cmd_recv;         // 底盘接收到的控制命令
 static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数据
 
-static referee_info_t* referee_data; // 用于获取裁判系统的数据
+// static referee_info_t* referee_data; // 用于获取裁判系统的数据
+extern referee_info_t* referee_info;
 static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
 
 static DJIMotorInstance *motor_lf, *motor_rf; // 两边的蓄力电机
@@ -100,7 +101,7 @@ extern int key;
 #define SPEED_3508 -4000
 
 // 速度环位置控制参数：远距离高速，近距离自动降速
-#define CHASSIS_3508_MAX_SPEED_CMD 10000.0f//通过这个控制整体速度，原来是 20000.0f
+#define CHASSIS_3508_MAX_SPEED_CMD 20000.0f//通过这个控制整体速度，原来是 20000.0f
 #define CHASSIS_3508_MIN_SPEED_CMD 9000.0f
 #define CHASSIS_3508_HOLD_SPEED_CMD 3500.0f
 #define CHASSIS_3508_POS2SPEED_KP 0.75f
@@ -532,7 +533,10 @@ void ChassisTask()
             int cur = DartSys.currentStep;
             if (tmpa==1)
                 return;
-
+            #ifdef REFEREE
+                if(referee_info->DartCmd.dart_launch_opening_status == 1)
+                    break;
+            #endif
             switch (cur)
             {
                 case 0:
@@ -558,7 +562,7 @@ void ChassisTask()
                             if (auto_reload_wait_start_ms > 0.0f)
                             {
                                 ChassisHoldAtLoadWithBias();
-                                if ((DWT_GetTimeline_ms() - auto_reload_wait_start_ms) >= 1000.0f)
+                                if ((DWT_GetTimeline_ms() - auto_reload_wait_start_ms) >= 500.0f)
                                 {
                                     i = 1;
                                     auto_reload_wait_start_ms = 0.0f;
@@ -984,7 +988,6 @@ void ChassisTask()
                         default:
                             break;
                     }
-                    tmpa = 1;
                     break;
                 default:
                     break;

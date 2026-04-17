@@ -833,11 +833,11 @@ void ShootTask()
 	}
 	// ServoSetAngle(gripper3_motor,1.0f);
 	// BanjiServoStepTest(); // 调用舵机阶梯测试函数
-	// ServoStepTest(gripper3_motor);
-	// relay_control(1, 0);
+	// ServoStepTest(gripper2_motor);
+	// relay_control(1, 1);
 	// relay_control(2, 1);
 	// relay_control(3, 0);
-	relay_control(3, 1);
+
 	rotateSlowMove();
 	switch (shoot_cmd_recv.shoot_mode)
 	{

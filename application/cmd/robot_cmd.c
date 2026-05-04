@@ -183,16 +183,28 @@ static void CalcOffsetAngle()
 {
 
 }
+int curDartCmd=0;
+int lastDartCmd=0;
+int inDartCmd=0;
 /**
  * @brief 控制输入为遥控器(调试时)的模式和控制量设置
  *
  */
 static void RemoteControlSet()
 {
+
+    curDartCmd = referee_info->DartCmd.dart_launch_opening_status;
+    if (curDartCmd == 0 && lastDartCmd != 0)
+    {
+        inDartCmd = 1; // 触发开门标志
+    }
+    lastDartCmd = curDartCmd;
+
     #ifdef MC_SBUS
     // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
     if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_MID) 
     {
+        inDartCmd = 0;
         int16_t rocker_r1 = rc_data[TEMP].rocker_r1;
         chassis_cmd_send.chassis_mode = CHASSIS_TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
         shoot_cmd_send.shoot_mode = SHOOT_TEST;
@@ -205,14 +217,14 @@ static void RemoteControlSet()
         }
         // shoot_cmd_send.shoot_data = -100.0f * (float)rc_data[TEMP].rocker_l1; 
         shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
-        // chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向，位置环
+        //chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向，位置环
         chassis_cmd_send.v1 = -15.0f * (float)rocker_r1; // 1竖直方向，速度环
         gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
         shoot_cmd_send.rotate_rate += 0.000005f*(float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度
 
         if(rc_data[TEMP].none[0] == 0xc8 && rc_data[TEMP].none[1] != 0xc8 && rc_data[TEMP].none[1] != 0x708)
         {
-            shoot_cmd_send.shoot_data = YELLOW_25M_SHOOT_ANGLE;
+            shoot_cmd_send.shoot_data = 0;
             // gimbal_cmd_send.yaw = YELLOW_25M_YAW_ANGLE;
         }
         else if(rc_data[TEMP].none[0] == 0x708 && rc_data[TEMP].none[1] != 0xc8 && rc_data[TEMP].none[1] != 0x708)
@@ -239,13 +251,15 @@ static void RemoteControlSet()
     }
     else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_DOWN) // 
     {
+        inDartCmd = 0;
         chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
         gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
         shoot_cmd_send.load_mode = LOAD_STOP;
         shoot_cmd_send.rotate_mode = ROTATE_STOP;
+        
     }
-    else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_UP)
+    else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_UP || inDartCmd == 1)
     {
         shoot_cmd_send.shoot_mode = SHOOT_AUTO; 
         gimbal_cmd_send.gimbal_mode = AUTO_DART;
@@ -368,6 +382,17 @@ static void RemoteControlSet()
         //自动模式
     }                                       
     #endif
+    // curDartCmd=referee_info->DartCmd.dart_launch_opening_status;
+    // if(curDartCmd == 0 && lastDartCmd != 0)
+    // {
+    //     inDartCmd = 1;
+    // }
+    // if(inDartCmd==1){
+    //     shoot_cmd_send.shoot_mode = SHOOT_AUTO;
+    //     gimbal_cmd_send.gimbal_mode = AUTO_DART;
+    //     chassis_cmd_send.chassis_mode = AUTO_MODE;
+    // }
+    // lastDartCmd=curDartCmd;
 }
 static void VisionControl()
 {

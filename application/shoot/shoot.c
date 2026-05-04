@@ -77,7 +77,7 @@ extern int flag_3508_max;
 #define dartNoExistWeight 0
 #define dartExistLength 0
 #define dartNoExistLength 0
-#define DM_STEP_VAL 0.0157f          // 最大速度: 180度/秒
+#define DM_STEP_VAL 0.0157f          // 最大速度: 180度/秒 0.0157f 
 #define DM_ACCEL_VAL 0.000157f       // 加速度: 每周期增加0.000157 rad
 #define DM_STOP_EPSILON 0.0025f      // 到位后直接锁定目标，避免末端抖动
 #define ROTATE_POWERON_SOFTSTART_MS 700U
@@ -165,7 +165,7 @@ static float calculateTff()
     return tff;
 }
 static float rotate_current_speed = 0; // 当前速度
-
+float abs_diff;
 static void rotateSlowMove(void)
 {
 	// 如果电机未使能（例如在 SHOOT_OFF 模式），持续同步设定值到当前位置
@@ -177,12 +177,13 @@ static void rotateSlowMove(void)
 	}
 
 	float diff = dm_target_angle - dm_current_setpoint;
-	float abs_diff = fabsf(diff);
+	abs_diff = fabsf(diff);
 
 	if (abs_diff <= DM_STOP_EPSILON) {
 		dm_current_setpoint = dm_target_angle;
 		rotate_current_speed = 0;
-		DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff());
+		// DMMotorSetRef(rotateChageDarts, dm_current_setpoint, calculateTff());
+		DMMotorSetRef(rotateChageDarts, dm_current_setpoint, 0);
 		return;
 	}
 
@@ -269,10 +270,10 @@ void servo_magnet_init(int *initFlag)
 		gripper1_wait_tick = HAL_GetTick();
 	
 	if (HAL_GetTick() - gripper1_wait_tick < 1500)
-		ServoSetAngle(gripper2_motor, GRIPPER_1_NORMAL_ANGLE);
+		ServoSetAngle(gripper1_motor, GRIPPER_1_NORMAL_ANGLE);
 	else
 	{
-		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
+		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
 		isGripper1Init = 1;
 	}
 
@@ -280,10 +281,10 @@ void servo_magnet_init(int *initFlag)
 		gripper2_wait_tick = HAL_GetTick();
 
 	if (HAL_GetTick() - gripper2_wait_tick < 1500)
-		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
+		ServoSetAngle(gripper2_motor, GRIPPER_2_NORMAL_ANGLE);
 	else
 	{
-		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
+		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
 		isGripper2Init = 1;
 	}
 
@@ -291,10 +292,10 @@ void servo_magnet_init(int *initFlag)
 		gripper3_wait_tick = HAL_GetTick();
 
 	if (HAL_GetTick() - gripper3_wait_tick < 1500)
-		ServoSetAngle(gripper1_motor, GRIPPER_3_NORMAL_ANGLE);
+		ServoSetAngle(gripper3_motor, GRIPPER_3_NORMAL_ANGLE);
 	else
 	{
-		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
+		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
 		isGripper3Init = 1;
 	}
 	if(isGripper1Init&&isGripper2Init&&isGripper3Init)
@@ -354,6 +355,7 @@ void ShootInit()
 	};
 	gripper3_motor = ServoInit(&gripper3_motor_config);
 
+	//控制扳机位置2006电机
 	Motor_Init_Config_s chargeLoader_config = {
 		.can_init_config =
 			{
@@ -402,7 +404,7 @@ void ShootInit()
 		.motor_type = M2006,
 		.storage_type = USE_STORAGE};
 	chargeLoader = DJIMotorInit(&chargeLoader_config);
-	// 达妙电机配置 - MIT 模式
+	// 达妙电机配置 - MIT 模式-控制夹爪角度
 	Motor_Init_Config_s dm_motor_config = {
 		.can_init_config =
 			{
@@ -422,9 +424,9 @@ void ShootInit()
 			{
 				.angle_PID =
 					{
-						.Kp = 2,
+						.Kp = 2.5,
 						.Kd = 10.0,
-						.Ki = 0.1,
+						.Ki = 0,
 						.Improve = PID_Integral_Limit |
 								   PID_ChangingIntegrationRate |
 								   PID_Trapezoid_Intergral,
@@ -577,20 +579,20 @@ void setKey1()
 	uint32_t dt = HAL_GetTick() - key1_start_tick;
 
 	if (dt < 1000) {
-		ServoSetAngle(gripper2_motor, GRIPPER_1_LAY_ANGLE);
-		relay_control(3, 0);
+		ServoSetAngle(gripper1_motor, GRIPPER_1_LAY_ANGLE);//gripper2_motor
+		relay_control(1, 0);
 	}
 	else if (dt < 1500) { // 1500 + 500
-		ServoSetAngle(gripper2_motor, GRIPPER_1_LAY_ANGLE);
-		relay_control(3, 1);
+		ServoSetAngle(gripper1_motor, GRIPPER_1_LAY_ANGLE);
+		relay_control(1, 1);
 	}
 	else if (dt < 3500) { // 2000 + 1500
-		ServoSetAngle(gripper2_motor, GRIPPER_1_NORMAL_ANGLE);
-		relay_control(3, 1);
+		ServoSetAngle(gripper1_motor, GRIPPER_1_NORMAL_ANGLE);
+		relay_control(1, 1);
 	}
 	else {
-		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
-		relay_control(3, 0);
+		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(1, 0);
 		DART_SET_BIT(1, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(1, FLAG_DART_DROPPED);
 		DART_SET_BIT(1, FLAG_RELOAD_ROTATED);//先默认置位
@@ -613,20 +615,20 @@ void setKey1Auto()
 	uint32_t dt = HAL_GetTick() - key1_start_tick;
 
 	if (dt < 1000) {
-		ServoSetAngle(gripper2_motor, GRIPPER_1_LAY_ANGLE);
-		relay_control(3, 0);
+		ServoSetAngle(gripper1_motor, GRIPPER_1_LAY_ANGLE);
+		relay_control(1, 0);
 	}
 	else if (dt < 1500) { // 1500 + 500
-		ServoSetAngle(gripper2_motor, GRIPPER_1_LAY_ANGLE);
-		relay_control(3, 1);
+		ServoSetAngle(gripper1_motor, GRIPPER_1_LAY_ANGLE);
+		relay_control(1, 1);
 	}
 	else if (dt < 3500) { // 2000 + 1500
-		ServoSetAngle(gripper2_motor, GRIPPER_1_NORMAL_ANGLE);
-		relay_control(3, 1);
+		ServoSetAngle(gripper1_motor, GRIPPER_1_NORMAL_ANGLE);
+		relay_control(1, 1);
 	}
 	else {
-		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
-		relay_control(3, 0);
+		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(1, 0);
 		DART_SET_BIT(1, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(1, FLAG_DART_DROPPED);
 		DART_SET_BIT(1, FLAG_RELOAD_ROTATED);//先默认置位
@@ -634,7 +636,7 @@ void setKey1Auto()
 }
 void setKey2()
 {
-	dm_target_angle = ROTATE_3_CHANGE_DARTS_ANGLE; // 设置目标角度为第三发位置
+	dm_target_angle = ROTATE_3_CHANGE_DARTS_ANGLE; // 设置目标角度为三发位置
 	if(fabs(rotateChageDarts->measure.position - dm_target_angle) > 0.1f)
 	{
 		key2_start_tick = 0;
@@ -649,20 +651,20 @@ void setKey2()
 	uint32_t dt = HAL_GetTick() - key2_start_tick;
 
 	if (dt < 1500) {
-		ServoSetAngle(gripper3_motor, GRIPPER_2_LAY_ANGLE);
-		relay_control(1, 0);
+		ServoSetAngle(gripper2_motor, GRIPPER_2_LAY_ANGLE);
+		relay_control(2, 0);
 	}
 	else if (dt < 2000) {
-		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
-		relay_control(1, 1);
+		ServoSetAngle(gripper2_motor, GRIPPER_2_NORMAL_ANGLE);
+		relay_control(2, 1);
 	}
 	else if (dt < 3500) {
-		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
-		relay_control(1, 1);
+		ServoSetAngle(gripper2_motor, GRIPPER_2_NORMAL_ANGLE);
+		relay_control(2, 1);
 	}
 	else {
-		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
-		relay_control(1, 0);
+		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(2, 0);
 		DART_SET_BIT(2, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(2, FLAG_DART_DROPPED);
 	}
@@ -684,20 +686,20 @@ void setKey2Auto()
 	uint32_t dt = HAL_GetTick() - key2_start_tick;
 
 	if (dt < 1500) {
-		ServoSetAngle(gripper3_motor, GRIPPER_2_LAY_ANGLE);
-		relay_control(1, 0);
+		ServoSetAngle(gripper2_motor, GRIPPER_2_LAY_ANGLE);
+		relay_control(2, 0);
 	}
 	else if (dt < 2000) {
-		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
-		relay_control(1, 1);
+		ServoSetAngle(gripper2_motor, GRIPPER_2_NORMAL_ANGLE);
+		relay_control(2, 1);
 	}
 	else if (dt < 3500) {
-		ServoSetAngle(gripper3_motor, GRIPPER_2_NORMAL_ANGLE);
-		relay_control(1, 1);
+		ServoSetAngle(gripper2_motor, GRIPPER_2_NORMAL_ANGLE);
+		relay_control(2, 1);
 	}
 	else {
-		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
-		relay_control(1, 0);
+		ServoSetAngle(gripper2_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(2, 0);
 		DART_SET_BIT(2, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(2, FLAG_DART_DROPPED);
 	}
@@ -719,20 +721,20 @@ void setKey3()
 	uint32_t dt = HAL_GetTick() - key3_start_tick;
 
 	if (dt < 1000) {
-		ServoSetAngle(gripper1_motor, GRIPPER_3_LAY_ANGLE);
-		relay_control(2, 0);
+		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);//gripper1_motor
+		relay_control(3, 0);
 	}
 	else if (dt < 1500) {
-		ServoSetAngle(gripper1_motor, GRIPPER_3_LAY_ANGLE);
-		relay_control(2, 1);
+		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
+		relay_control(3, 1);
 	}
 	else if (dt < 3500) {
-		ServoSetAngle(gripper1_motor, GRIPPER_3_NORMAL_ANGLE);
-		relay_control(2, 1);
+		ServoSetAngle(gripper3_motor, GRIPPER_3_NORMAL_ANGLE);
+		relay_control(3, 1);
 	}
 	else {
-		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
-		relay_control(2, 0);
+		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(3, 0);
 		DART_SET_BIT(3, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(3, FLAG_DART_DROPPED);
 	}
@@ -754,20 +756,20 @@ void setKey3Auto()
 	uint32_t dt = HAL_GetTick() - key3_start_tick;
 
 	if (dt < 1000) {
-		ServoSetAngle(gripper1_motor, GRIPPER_3_LAY_ANGLE);
-		relay_control(2, 0);
+		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
+		relay_control(3, 0);
 	}
 	else if (dt < 1500) {
-		ServoSetAngle(gripper1_motor, GRIPPER_3_LAY_ANGLE);
-		relay_control(2, 1);
+		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
+		relay_control(3, 1);
 	}
 	else if (dt < 3500) {
-		ServoSetAngle(gripper1_motor, GRIPPER_3_NORMAL_ANGLE);
-		relay_control(2, 1);
+		ServoSetAngle(gripper3_motor, GRIPPER_3_NORMAL_ANGLE);
+		relay_control(3, 1);
 	}
 	else {
-		ServoSetAngle(gripper1_motor, GRIPPER_CLOSE_ANGLE);
-		relay_control(2, 0);
+		ServoSetAngle(gripper3_motor, GRIPPER_CLOSE_ANGLE);
+		relay_control(3, 0);
 		DART_SET_BIT(3, FLAG_ARM_ANGLE_READY);
 		DART_SET_BIT(3, FLAG_DART_DROPPED);
 	}
@@ -800,7 +802,7 @@ float getBackPosAngle(int key){
 	}
 	return YELLOW_25M_SHOOT_ANGLE;
 }
-
+#define REFEREE
 int cmd;
 int tmpa=0;
 int start_0_time = 0;
@@ -836,7 +838,7 @@ void ShootTask()
 	// ServoStepTest(gripper2_motor);
 	// relay_control(1, 1);
 	// relay_control(2, 1);
-	// relay_control(3, 0);
+	// relay_control(3, 1);
 
 	rotateSlowMove();
 	switch (shoot_cmd_recv.shoot_mode)
@@ -851,64 +853,6 @@ void ShootTask()
 	case SHOOT_TEST:
 		DJIMotorEnable(chargeLoader);
 		DMMotorEnable(rotateChageDarts);
-		/*
-		{
-			cmd = shoot_cmd_recv.GripperTest;
-			if (cmd != last_gripper_cmd)
-			{
-				if (cmd >= 1 && cmd <= 3 && reload_state == RELOAD_IDLE)
-				{
-					reload_key = (uint8_t)cmd;
-					resetKeyTicks();
-					clearKeyDoneFlag(reload_key);
-					reload_state = RELOAD_WAIT_TRIGGER_POS;
-					hold_rotate_after_reload = 0;
-					hold_loader_after_reload = 0;
-				}
-				last_gripper_cmd = cmd;
-			}
-
-			if (reload_state != RELOAD_IDLE)
-			{
-				DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-				switch (reload_state)
-				{
-				case RELOAD_WAIT_TRIGGER_POS:
-					dm_target_angle = getCurrentAngel(cmd);
-					DJIMotorSetRef(chargeLoader, RELOAD_TRIGGER_POS);
-					if (CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, RELOAD_TRIGGER_POS, RELOAD_TRIGGER_DEADBAND))
-					{
-						reload_state = RELOAD_RUN_KEY;
-					}
-					break;
-				case RELOAD_RUN_KEY:
-					dm_target_angle = getCurrentAngel(cmd);
-					runKey(reload_key);
-					if (isKeyDone(reload_key))
-					{
-						reload_state = RELOAD_WAIT_TRIGGER_BACK;
-					}
-					break;
-				case RELOAD_WAIT_TRIGGER_BACK:
-					dm_target_angle = getCurrentAngel(cmd);				
-					DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
-					if (CHECK_ANGLE_ARRIVED(chargeLoader->measure.total_angle, getBackPosAngle(cmd), RELOAD_TRIGGER_DEADBAND))
-					{
-						reload_state = RELOAD_IDLE;
-						reload_key = 0;
-						hold_rotate_after_reload = 1;
-						hold_loader_after_reload = 1;
-					}
-					break;
-				default:
-					reload_state = RELOAD_IDLE;
-					reload_key = 0;
-					break;
-				}
-				break;
-			}
-		}
-		*/
 		switch (shoot_cmd_recv.banji_mode)
 		{
 		case BANJI_ON:
@@ -959,17 +903,6 @@ void ShootTask()
 			DMMotorStop(rotateChageDarts);
 			break;
 		case ROTATE_TEST:
-			// if (hold_rotate_after_reload)
-			// {
-			// 	dm_target_angle = getCurrentAngel(cmd);
-			// }
-			// else
-			// {
-			// 	dm_target_angle = shoot_cmd_recv.rotate_rate;
-			// }
-			// //力矩正方向是面对镖架的顺时针
-			dm_target_angle = shoot_cmd_recv.rotate_rate;
-			// DMMotorSetRef(rotateChageDarts, shoot_cmd_recv.rotate_rate, calculateTff());
 			break;
 		case ROTATE_AUTO:
 			/* code */
@@ -998,12 +931,12 @@ void ShootTask()
 		DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
 		int cur = DartSys.currentStep;
 		// if(cur==0)
-		// 	DartSys.currentStep+=3;
-		#ifdef REFEREE
-			//1是关闭，2 是正在开启，0 是已经开启
-			if(referee_info->DartCmd.dart_launch_opening_status == 1)
-				break;
-		#endif
+		// 	DartSys.currentStep+=2;
+		// #ifdef REFEREE
+		// 	//1是关闭，2 是正在开启，0 是已经开启
+		// if(referee_info->DartCmd.dart_launch_opening_status == 1)
+		// 	break;
+		// #endif
 		if(tmpa==1) {
 			break;
 		}

@@ -264,6 +264,9 @@ static void RemoteControlSet()
         shoot_cmd_send.shoot_mode = SHOOT_AUTO; 
         gimbal_cmd_send.gimbal_mode = AUTO_DART;
         chassis_cmd_send.chassis_mode = AUTO_MODE;
+        #ifdef VIRSION
+            gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;
+        #endif // DEBUG
     }
 
     //控制扳机
@@ -280,7 +283,6 @@ static void RemoteControlSet()
         shoot_cmd_send.banji_mode = BANJI_OFF;
     }                        
     #endif
-
     #ifdef DBUS
     // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
     if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 

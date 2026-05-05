@@ -839,7 +839,9 @@ void ShootTask()
 	// relay_control(1, 1);
 	// relay_control(2, 1);
 	// relay_control(3, 1);
-
+	int tmp = DartSys.currentStep;
+	VisionSetCur(tmp);
+	VisionSetFlag(1);
 	rotateSlowMove();
 	switch (shoot_cmd_recv.shoot_mode)
 	{
@@ -869,16 +871,6 @@ void ShootTask()
 		switch (shoot_cmd_recv.load_mode)
 		{
 		case LOAD_STOP:
-			// if (hold_loader_after_reload)
-			// {
-			// 	DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-			// 	DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
-			// }
-			// else
-			// {
-			// 	DJIMotorOuterLoop(chargeLoader, SPEED_LOOP); // 切换到速度环
-			// 	DJIMotorSetRef(chargeLoader, 0);			 // 同时设定
-			// }
 			DJIMotorStop(chargeLoader);
 			break;
 		case LOADER_TEST:
@@ -886,10 +878,6 @@ void ShootTask()
 			DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
 			// DJIMotorOuterLoop(chargeLoader, SPEED_LOOP);
 			DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
-			// if(hold_loader_after_reload)
-			// 	DJIMotorSetRef(chargeLoader, getBackPosAngle(cmd));
-			// else
-			// 	DJIMotorSetRef(chargeLoader, shoot_cmd_recv.shoot_data);
 			break;
 		case AUTO_LOAD:
 			/* code */
@@ -930,6 +918,7 @@ void ShootTask()
 		DMMotorEnable(rotateChageDarts);
 		DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
 		int cur = DartSys.currentStep;
+		VisionSetCur(cur);
 		// if(cur==0)
 		// 	DartSys.currentStep+=2;
 		// #ifdef REFEREE

@@ -57,12 +57,10 @@ static uint8_t filter_idx = 0;
 //     return sum / (float)count;
 // }
 
-// void VisionSetFlag(Enemy_Color_e enemy_color, Work_Mode_e work_mode, Bullet_Speed_e bullet_speed)
-// {
-//     send_data.enemy_color = enemy_color;
-//     send_data.work_mode = work_mode;
-//     send_data.bullet_speed = bullet_speed;
-// }
+void VisionSetFlag(Enemy_Color_e enemy_color)
+{
+    send_data.enemy = enemy_color;
+}
 
 // void VisionSetAltitude(float yaw, float pitch, float roll)
 // {
@@ -71,9 +69,14 @@ static uint8_t filter_idx = 0;
 //     send_data.roll = roll;
 // }
 
+void VisionSetCur(int cur)
+{
+    send_data.cur = cur;
+}
+
 void VisionSetAngle(float encoderAngle)
 {
-    send_data.encoderAngle = encoderAngle;
+    send_data.encoder_angle = encoderAngle;
 }
 
 /**

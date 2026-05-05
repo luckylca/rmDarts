@@ -54,8 +54,8 @@ typedef struct
 typedef enum
 {
 	COLOR_NONE = 0,
-	COLOR_BLUE = 1,
-	COLOR_RED = 2,
+	QIANSHAO = 1,
+	JIDI = 2,
 } Enemy_Color_e;
 
 typedef enum
@@ -77,16 +77,9 @@ typedef enum
 
 typedef struct
 {
-	// Enemy_Color_e enemy_color;
-	// Work_Mode_e work_mode;
-	// Bullet_Speed_e bullet_speed;
-
-	// float yaw;
-	// float pitch;
-	// float roll;
-	float encoderAngle;
-	
-
+	int enemy; // 0:无目标 1:前哨站 2:基地
+	int cur; // 0,1,2,3发飞镖
+	float encoder_angle; //编码器角度
 } Vision_Send_s;
 
 extern RX_PACKET rx_packet;
@@ -113,7 +106,7 @@ void VisionSend();
  * @param work_mode
  * @param bullet_speed
  */
-void VisionSetFlag(Enemy_Color_e enemy_color, Work_Mode_e work_mode, Bullet_Speed_e bullet_speed);
+void VisionSetFlag(Enemy_Color_e enemy_color);
 
 /**
  * @brief 设置发送数据的姿态部分
@@ -122,6 +115,8 @@ void VisionSetFlag(Enemy_Color_e enemy_color, Work_Mode_e work_mode, Bullet_Spee
  * @param pitch
  */
 void VisionSetAltitude(float yaw, float pitch, float roll);
+void VisionSetCur(int cur);
 void VisionSetAngle(float encoderAngle);
+
 
 #endif // !MASTER_PROCESS_H

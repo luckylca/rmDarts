@@ -32,30 +32,30 @@ void GimbalInit()
         .controller_param_init_config =
             {
                 .angle_PID =
-                    {
-                        .Kp = 5, // 10
-                        .Ki = 0,//0
-                        .Kd = 0,//1
-                        .MaxOut = 500000,
-                    },
-                .speed_PID =
-                    {
-                        .Kp = 5, // 15
-                        .Ki = 0,  // 1
-                        .Kd = 0,
-                        .Improve = PID_Integral_Limit,
-                        .IntegralLimit = 600,
-                        .MaxOut = 2000,
-                    },
-                .current_PID =
-                    {
-                        .Kp = 0.5, // 0.5
-                        .Ki = 0.1, // 0.1
-                        .Kd = 0,
-                        .Improve = PID_Integral_Limit,
-                        .IntegralLimit = 300,
-                        .MaxOut = 800,
-                    },
+					{
+						.Kp = 10, // 10
+						.Ki = 0,
+						.Kd = 0,
+						.MaxOut = 300000,
+					},
+				.speed_PID =
+					{
+						.Kp = 5, // 10
+						.Ki = 1,  // 1
+						.Kd = 0,
+						.Improve = PID_Integral_Limit,
+						.IntegralLimit = 5000,
+						.MaxOut = 100000,
+					},
+				.current_PID =
+					{
+						.Kp = 0.5, // 0.7
+						.Ki = 0.1, // 0.1
+						.Kd = 0,
+						.Improve = PID_Integral_Limit,
+						.IntegralLimit = 5000,
+						.MaxOut = 7000,
+					},
             },
         .controller_setting_init_config =
             {
@@ -86,7 +86,7 @@ void GimbalInit()
         .callback = NULL,
         .id = NULL,
     };
-    // encoder = EncoderInit(&encoder_spi_config);
+    encoder = EncoderInit(&encoder_spi_config);
 
     gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     gimbal_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
@@ -96,7 +96,7 @@ void GimbalTask()
 {
 
     SubGetMessage(gimbal_sub, &gimbal_cmd_recv);
-    // VisionSetAngle(encoder->measure.angle);
+    VisionSetAngle(encoder->measure.angle);
     switch (gimbal_cmd_recv.gimbal_mode)
     {
     case GIMBAL_ZERO_FORCE:

@@ -76,7 +76,7 @@ void GimbalInit()
 		.type = DJI_MOTOR,
 		.data.dji = yaw_motor,
 	};
-	// motorRecoderRegister(&recoder_init_config);
+	motorRecoderRegister(&recoder_init_config);
 
     SPI_Init_Config_s encoder_spi_config = {
         .spi_handle = &hspi2,
@@ -96,7 +96,8 @@ void GimbalTask()
 {
 
     SubGetMessage(gimbal_sub, &gimbal_cmd_recv);
-    VisionSetAngle(encoder->measure.angle);
+    // VisionSetAngle(encoder->measure.angle);
+    VisionSetAngle(yaw_motor->measure.total_angle);
     switch (gimbal_cmd_recv.gimbal_mode)
     {
     case GIMBAL_ZERO_FORCE:

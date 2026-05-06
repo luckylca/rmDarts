@@ -840,8 +840,8 @@ void ShootTask()
 	// relay_control(2, 1);
 	// relay_control(3, 1);
 	int tmp = DartSys.currentStep;
-	VisionSetCur(tmp);
-	VisionSetFlag(1);
+	VisionSetCur(1);
+	VisionSetFlag(2);
 	rotateSlowMove();
 	switch (shoot_cmd_recv.shoot_mode)
 	{

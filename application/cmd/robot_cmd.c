@@ -201,12 +201,12 @@ static void RemoteControlSet()
     }
     lastDartCmd = curDartCmd;
     visionData = vision_recv_data->err_of_pix;
-    if(fabs(visionData)>500)
+    if(fabs(visionData)>250)
     {
         if(visionData>0)
-            visionData = 500;
+            visionData = 250;
         else
-            visionData = -500;
+            visionData = -250;
     }
     #ifdef MC_SBUS
     // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
@@ -272,6 +272,7 @@ static void RemoteControlSet()
         shoot_cmd_send.shoot_mode = SHOOT_AUTO; 
         gimbal_cmd_send.gimbal_mode = AUTO_DART;
         chassis_cmd_send.chassis_mode = AUTO_MODE;
+        VisionSetFlag(JIDI);
         #ifdef VIRSION
             gimbal_cmd_send.yaw -= 1.5f * visionData;
         #endif // DEBUG
@@ -288,7 +289,13 @@ static void RemoteControlSet()
     }
     else if (mc_data_change(rc_data[TEMP].switch_l)==RC_SW_UP) // 左 侧开关状态[上],
     {
-        shoot_cmd_send.banji_mode = BANJI_OFF;
+        shoot_cmd_send.shoot_mode = SHOOT_AUTO; 
+        gimbal_cmd_send.gimbal_mode = AUTO_DART;
+        chassis_cmd_send.chassis_mode = AUTO_MODE;
+        VisionSetFlag(QIANSHAO);
+        #ifdef VIRSION
+            gimbal_cmd_send.yaw -= 1.5f * visionData;
+        #endif // DEBUG
     }                        
     #endif
     #ifdef DBUS

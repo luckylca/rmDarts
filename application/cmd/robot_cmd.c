@@ -183,6 +183,7 @@ static void CalcOffsetAngle()
 {
 
 }
+float visionData=0;
 int curDartCmd=0;
 int lastDartCmd=0;
 int inDartCmd=0;
@@ -199,7 +200,14 @@ static void RemoteControlSet()
         inDartCmd = 1; // 触发开门标志
     }
     lastDartCmd = curDartCmd;
-
+    visionData = vision_recv_data->err_of_pix;
+    if(fabs(visionData)>500)
+    {
+        if(visionData>0)
+            visionData = 500;
+        else
+            visionData = -500;
+    }
     #ifdef MC_SBUS
     // 目前打算是中间统一为测试模式，底部统一为失能，顶部为自动模式
     if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_MID) 
@@ -246,7 +254,7 @@ static void RemoteControlSet()
         }
         
         #ifdef VIRSION
-        gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;
+        gimbal_cmd_send.yaw -= 1.5f * visionData;
         #endif // DEBUG
     }
     else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_DOWN) // 
@@ -265,7 +273,7 @@ static void RemoteControlSet()
         gimbal_cmd_send.gimbal_mode = AUTO_DART;
         chassis_cmd_send.chassis_mode = AUTO_MODE;
         #ifdef VIRSION
-            gimbal_cmd_send.yaw -= 1.5f * vision_recv_data->err_of_pix;
+            gimbal_cmd_send.yaw -= 1.5f * visionData;
         #endif // DEBUG
     }
 

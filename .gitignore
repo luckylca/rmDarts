@@ -50,7 +50,7 @@ dkms.conf
 
 # Build and dependencies
 build/
-Drivers/
+# Drivers/
 
 # IDE
 .idea/

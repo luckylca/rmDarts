@@ -803,33 +803,21 @@ float getBackPosAngle(int key){
 	return YELLOW_25M_SHOOT_ANGLE;
 }
 
-static void Check_shijue_in_place( int cur){
-	//视觉到位判断
-	if(shoot_cmd_recv.keep_2==1)
-	{
-		switch (cur)
-		{
-		case 0:
-			DART_SET_BIT(0,FLAG_IN_PLACE);
-			break;
-		case 1:
-			DART_SET_BIT(1,FLAG_IN_PLACE);
-			break;
-		case 2:
-			DART_SET_BIT(2,FLAG_IN_PLACE);
-			break;
-		case 3:
-			DART_SET_BIT(3,FLAG_IN_PLACE);
-			break;
-		default:
-			break;
+static void Check_shijue_in_place(float cur)
+{
+	// 视觉到位判断：当视觉标志 `keep_2` 为真时设置到位标志，
+	// 否则确保对应的到位标志被清除，避免误触发发射条件。
+	if (shoot_cmd_recv.keep_2 == 1) {
+		if (cur >= 0 && cur < 4) {
+			DART_SET_BIT(cur, FLAG_IN_PLACE);
+		}
+	} else {
+		if (cur >= 0 && cur < 4) {
+			DART_CLEAR_BIT(cur, FLAG_IN_PLACE);
 		}
 	}
-	else
-	{
-		return 0;
-	}
 }
+
 #define REFEREE
 int cmd;
 int tmpa=0;

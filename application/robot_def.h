@@ -225,6 +225,7 @@ typedef struct
     float rotate_rate;
     float banjiPos;
     int GripperTest;
+    int keep_2;
 } Shoot_Ctrl_Cmd_s;
 
 /* ----------------gimbal/shoot/chassis发布的反馈数据----------------*/

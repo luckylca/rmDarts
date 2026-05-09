@@ -488,6 +488,7 @@ void RobotCMDTask()
     RemoteControlSet();   
     EmergencyHandler(); // 处理模块离线和遥控器急停等紧急情况
     VisionSend();
+    shoot_cmd_send.keep_2=vision_recv_data->keep_2;
 #ifdef ONE_BOARD
     PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
 #endif // ONE_BOARD

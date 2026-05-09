@@ -22,7 +22,7 @@
 // --- C. 动作完成标志 (10-15位) ---
 #define FLAG_DART_DROPPED (1 << 11) // 电磁铁已断电，飞镖已掉入扳机
 #define FLAG_FIRED (1 << 12)        // 扳机已释放，飞镖已射出
-#define FLAG_STEP_DONE (1 << 13)    // 本发流程全部结束
+#define FLAG_IN_PLACE (1 << 13)    // 视觉通信完毕
 
 // ==========================================
 // 2. 组合掩码 (逻辑判断核心)
@@ -43,7 +43,8 @@
                             FLAG_L_CHARGE_REACHED | FLAG_R_CHARGE_REACHED |   \
                             FLAG_L_REBOUND_REACHED | FLAG_R_REBOUND_REACHED | \
                             FLAG_GIMBAL_AIMED |                               \
-                            FLAG_DART_DROPPED)//准备发射标志位
+                            FLAG_DART_DROPPED | \
+                            FLAG_IN_PLACE )//准备发射标志位
 
 // ==========================================
 // 3. 数据结构与宏

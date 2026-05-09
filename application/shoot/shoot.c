@@ -802,6 +802,34 @@ float getBackPosAngle(int key){
 	}
 	return YELLOW_25M_SHOOT_ANGLE;
 }
+
+static void Check_shijue_in_place( int cur){
+	//视觉到位判断
+	if(shoot_cmd_recv.keep_2==1)
+	{
+		switch (cur)
+		{
+		case 0:
+			DART_SET_BIT(0,FLAG_IN_PLACE);
+			break;
+		case 1:
+			DART_SET_BIT(1,FLAG_IN_PLACE);
+			break;
+		case 2:
+			DART_SET_BIT(2,FLAG_IN_PLACE);
+			break;
+		case 3:
+			DART_SET_BIT(3,FLAG_IN_PLACE);
+			break;
+		default:
+			break;
+		}
+	}
+	else
+	{
+		return 0;
+	}
+}
 #define REFEREE
 int cmd;
 int tmpa=0;
@@ -929,6 +957,7 @@ void ShootTask()
 		if(tmpa==1) {
 			break;
 		}
+		Check_shijue_in_place(cur);
 		switch (cur) {
 			case 0:
 			{

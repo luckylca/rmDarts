@@ -22,7 +22,7 @@
 // --- C. 动作完成标志 (10-15位) ---
 #define FLAG_DART_DROPPED (1 << 11) // 电磁铁已断电，飞镖已掉入扳机
 #define FLAG_FIRED (1 << 12)        // 扳机已释放，飞镖已射出
-#define FLAG_IN_PLACE (1 << 13)    // 视觉通信完毕
+#define FLAG_IN_PLACE (1 << 13)    // 视觉通信到位
 
 // ==========================================
 // 2. 组合掩码 (逻辑判断核心)
@@ -38,13 +38,13 @@
 
 #define MASK_READY_TO_CHASSIS (FLAG_DART_DROPPED)//检查飞镖是否掉落
                             
-// [发射条件]：扳机必须顶出发射位 + 蓄力/反弹电机OK + 云台瞄准OK + 且飞镖已经装进去了
+// [发射条件]：扳机必须顶出发射位 + 蓄力/反弹电机OK + 云台瞄准OK + 且飞镖已经装进去了+视觉到位
 #define MASK_READY_TO_FIRE (FLAG_TRIGGER_AT_SHOOT_POS |                       \
                             FLAG_L_CHARGE_REACHED | FLAG_R_CHARGE_REACHED |   \
                             FLAG_L_REBOUND_REACHED | FLAG_R_REBOUND_REACHED | \
                             FLAG_GIMBAL_AIMED |                               \
                             FLAG_DART_DROPPED | \
-                            FLAG_IN_PLACE )//准备发射标志位
+                            FLAG_IN_PLACE)//准备发射标志位
 
 // ==========================================
 // 3. 数据结构与宏

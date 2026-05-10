@@ -12,7 +12,7 @@
 #include "main.h"
 #include "usart.h"
 
-#define MC_SBUS
+// #define MC_SBUS
 
 #define MC_SBUS_USER_CHANNELS		6
 /* User configuration */

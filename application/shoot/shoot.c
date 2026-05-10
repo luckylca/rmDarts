@@ -790,34 +790,33 @@ float getCurrentAngel(int key){
 	return 0.0f;
 }
 
-float getBackPosAngle(int key){
-	if(key == 1){
-		return GREEN_25M_SHOOT_ANGLE;
-	}
-	else if(key == 2){
-		return BLUE_25M_SHOOT_ANGLE;
-	}
-	else if(key == 3){
-		return PURPLE_25M_SHOOT_ANGLE;
-	}
-	return YELLOW_25M_SHOOT_ANGLE;
-}
-
-static void Check_shijue_in_place(float cur)
-{
-	// 视觉到位判断：当视觉标志 `keep_2` 为真时设置到位标志，
-	// 否则确保对应的到位标志被清除，避免误触发发射条件。
-	if (shoot_cmd_recv.keep_2 == 1) {
-		if (cur >= 0 && cur < 4) {
-			DART_SET_BIT(cur, FLAG_IN_PLACE);
-		}
-	} else {
-		if (cur >= 0 && cur < 4) {
-			DART_CLEAR_BIT(cur, FLAG_IN_PLACE);
+static void Check_shijue_in_place( int cur){
+	//视觉到位判断
+	if(shoot_cmd_recv.keep_2==1 && fabs(shoot_cmd_recv.err_of_pix) < 20.0f)
+	{
+		switch (cur)
+		{
+		case 0:
+			DART_SET_BIT(0,FLAG_IN_PLACE);
+			break;
+		case 1:
+			DART_SET_BIT(1,FLAG_IN_PLACE);
+			break;
+		case 2:
+			DART_SET_BIT(2,FLAG_IN_PLACE);
+			break;
+		case 3:
+			DART_SET_BIT(3,FLAG_IN_PLACE);
+			break;
+		default:
+			break;
 		}
 	}
+	else
+	{
+		return;
+	}
 }
-
 #define REFEREE
 int cmd;
 int tmpa=0;
@@ -827,11 +826,32 @@ int start_2_time = 0;
 int start_3_time = 0;
 int tmpb = 0;
 extern int i;
+extern int autoCount;
+// 记录上一次模式，用于检测从非 AUTO -> AUTO 的切换
+static int prev_shoot_mode = SHOOT_OFF;
+// 记录进入 AUTO 模式的次数（持续上电期间累积）
+static int auto_enter_count = 0;
+// 允许运行的最大发射步骤（0..3），首次进入 AUTO 只允许前两发（0 和 1）
+static int allowed_max_step = 3;
 /* 机器人发射机构控制核心任务 */
 void ShootTask()
 {
 	// 从cmd获取控制数据
 	SubGetMessage(shoot_sub, &shoot_cmd_recv);
+	// 检测是否由非 AUTO 切换到 AUTO，用于统计进入 AUTO 的次数
+	if (prev_shoot_mode != shoot_cmd_recv.shoot_mode) {
+		if (shoot_cmd_recv.shoot_mode == SHOOT_AUTO) {
+			auto_enter_count++;
+			if (auto_enter_count == 1) {
+				// 首次进入 AUTO：只允许前两发（步骤 0 和 1）
+				allowed_max_step = 1;
+			} else if (auto_enter_count == 2) {
+				// 第二次进入 AUTO：允许完成所有四发
+				allowed_max_step = 3;
+			}
+		}
+		prev_shoot_mode = shoot_cmd_recv.shoot_mode;
+	}
 	if(!initServoMagnet){
 		servo_magnet_init(&initServoMagnet);
 	}
@@ -855,9 +875,8 @@ void ShootTask()
 	// relay_control(1, 1);
 	// relay_control(2, 1);
 	// relay_control(3, 1);
-	int tmp = DartSys.currentStep;
-	VisionSetCur(1);
-	VisionSetFlag(2);
+	// VisionSetCur(1);
+	// VisionSetFlag(2);
 	rotateSlowMove();
 	switch (shoot_cmd_recv.shoot_mode)
 	{
@@ -933,19 +952,23 @@ void ShootTask()
 		DJIMotorEnable(chargeLoader);
 		DMMotorEnable(rotateChageDarts);
 		DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-		int cur = DartSys.currentStep;
+		// 限制在 allowed_max_step 之外不执行发射流程（用于实现首次只发前两发）
+		if (DartSys.currentStep > allowed_max_step) {
+			break;
+		}
+		int cur = DartSys.currentStep; 
 		VisionSetCur(cur);
 		// if(cur==0)
-		// 	DartSys.currentStep+=2;
+		// 	DartSys.currentStep+=1;
 		// #ifdef REFEREE
 		// 	//1是关闭，2 是正在开启，0 是已经开启
 		// if(referee_info->DartCmd.dart_launch_opening_status == 1)
 		// 	break;
 		// #endif
+		Check_shijue_in_place(cur);
 		if(tmpa==1) {
 			break;
 		}
-		Check_shijue_in_place(cur);
 		switch (cur) {
 			case 0:
 			{
@@ -1001,7 +1024,10 @@ void ShootTask()
 					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
 					DART_SET_BIT(1, FLAG_FIRED);
 					i=0;
-					DartSys.currentStep++;
+					if(autoCount!=1)
+					{
+						DartSys.currentStep++;
+					}
 				}
 				break;
 			}

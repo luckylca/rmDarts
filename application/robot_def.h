@@ -42,7 +42,7 @@
 #define GRIPPER_1_NORMAL_ANGLE 0.075f // 夹爪正常角度
 #define GRIPPER_2_LAY_ANGLE 0.500f // 夹爪放置角度//600
 #define GRIPPER_2_NORMAL_ANGLE 0.0650f // 夹爪正常角度
-#define GRIPPER_3_LAY_ANGLE 0.050f // 夹爪放置角度  
+#define GRIPPER_3_LAY_ANGLE 0.055f // 夹爪放置角度  
 #define GRIPPER_3_NORMAL_ANGLE 0.030f // 夹爪正常角度
 
 #define LF_RELOAD_ANGLE  -24000.0f               //左边换弹位置
@@ -68,15 +68,17 @@
 // #define BLUE_25M_SHOOT_ANGLE -385246.7f //  蓝色25m发射位置
 // #define PURPLE_25M_SHOOT_ANGLE -385246.7f // 紫色25m发射位置
 
-#define YELLOW_25M_SHOOT_ANGLE 580488.0f // 黄色25m发射位置;-115000.7f；-539260.0f
-#define GREEN_25M_SHOOT_ANGLE 580488.0f //  绿色25m发射位置;-105000.7f；-.344f
-#define BLUE_25M_SHOOT_ANGLE 580488.0f //  蓝色25m发射位置;-95000.7f；110745.789f
-#define PURPLE_25M_SHOOT_ANGLE 580488.0f // 紫色25m发射位置;-85000.7f；
+#define YELLOW_25M_SHOOT_ANGLE -380000.0f // 黄色25m发射位置;-115000.7f；-539260.0f
+#define GREEN_25M_SHOOT_ANGLE -375000.0f //  绿色25m发射位置;-105000.7f；-.344f
+#define BLUE_25M_SHOOT_ANGLE -370000.0f //  蓝色25m发射位置;-95000.7f；110745.789f
+#define PURPLE_25M_SHOOT_ANGLE -365000.0f // 紫色25m发射位置;-85000.7f；
 
 #define YELLOW_25M_YAW_ANGLE -41317.6f // 黄色25m发射位置
 #define GREEN_25M_YAW_ANGLE 15584.0f //  绿色25m发射位置
 #define BLUE_25M_YAW_ANGLE -67444.5f //  蓝色25m发射位置
 #define PURPLE_25M_YAW_ANGLE -63924.5f // 紫色25m发射位置
+
+#define R_POSITION_LIMIT -700000.0f // 2006最右位置+++++++++++++++++++限制
 
 #define REFEREE
 
@@ -226,6 +228,7 @@ typedef struct
     float banjiPos;
     int GripperTest;
     float keep_2;
+    float err_of_pix;
 } Shoot_Ctrl_Cmd_s;
 
 /* ----------------gimbal/shoot/chassis发布的反馈数据----------------*/

@@ -45,7 +45,7 @@ typedef struct
 	// float yaw;
 	float err_of_pix;
 	float keep_1;
-	float keep_2;
+	float aim_imformation;
 	float keep_3;
 
 } Vision_Recv_s;

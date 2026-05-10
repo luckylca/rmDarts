@@ -6,6 +6,7 @@
 // module
 #include "remote_control.h"
 #include "mc6c.h"
+#include "flysky.h"
 #include "ins_task.h"
 #include "master_process.h"
 #include "message_center.h"
@@ -40,7 +41,8 @@ UART_HandleTypeDef huart2;
 static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信息
 static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息
 
-static MC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
+// static MC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
+static FS_ctrl_t *rc_data;
 static volatile double *F_data_1 = NULL;
 static volatile double *F_data_2 = NULL;
 static Vision_Recv_s *vision_recv_data; // 视觉接收数据指针,初始化时返回
@@ -73,6 +75,7 @@ referee_info_t* referee_info;
 int reverse_flag = 0;
 int hit_turning = 0;
 float flag_vision_ = 0;
+int LAST_MODE = 0;
 
 static PIDRefs* pid_refs;
 // 蜂鸣器buzzer
@@ -137,8 +140,8 @@ void RobotCMDInit()
 
 
     // rc_data = RemoteControlInit(&huart3);   // 修改为对应串口,注意如果是自研板dbus协议串口需选用添加了反相器的那个
-    rc_data = MCControlInit(&huart3);
-
+    // rc_data = MCControlInit(&huart3);
+    rc_data = FSControlInit(&huart3);
     F_data_1 = F_Init(&huart1);
     // F_data_2 = F_Init(&huart6);
     vision_recv_data = VisionInit(&huart2); // 视觉通信串口，这个不实际占用串口
@@ -185,22 +188,49 @@ static void CalcOffsetAngle()
 }
 float visionData=0;
 int curDartCmd=0;
-int lastDartCmd=0;
 int inDartCmd=0;
-/**
- * @brief 控制输入为遥控器(调试时)的模式和控制量设置
- *
- */
-static void RemoteControlSet()
+
+
+
+
+static float YawSoftwareLimit()
+{
+    float current_angle = gimbal_cmd_send.yaw; 
+    
+    // 左限位：小于-550000时，如果视觉想继续往左转（正偏移）
+    if (current_angle < R_POSITION_LIMIT && vision_recv_data->err_of_pix > 0.0f)
+    {
+        return 0.0f;
+    }
+    else
+    {
+        return vision_recv_data->err_of_pix;
+    }
+    
+    // 右限位：大于550000时，如果视觉想继续往右转（负偏移），忽略
+    // if (current_angle > 550000.0f && vision_offset < 0.0f)
+    // {
+    //     return 0.0f;
+    // }
+    
+}
+uint8_t gameState=0;
+uint8_t remainTime=0;
+int autoCount=0;
+static void RemoteControlSet( float vision_offset)
 {
 
     curDartCmd = referee_info->DartCmd.dart_launch_opening_status;
-    if (curDartCmd == 0 && lastDartCmd != 0)
-    {
-        inDartCmd = 1; // 触发开门标志
-    }
-    lastDartCmd = curDartCmd;
-    visionData = vision_recv_data->err_of_pix;
+    gameState = referee_info->GameState.game_type;
+    remainTime = referee_info->DartInfo.dart_remaining_time;
+    // if(remainTime<=5&&inDartCmd==1){
+    //     inDartCmd = 0;
+    // }
+    // if (curDartCmd == 0 && gameState == 1)
+    // {
+    //     inDartCmd = 1; // 触发开门标志
+    // }
+    visionData = vision_offset;
     if(fabs(visionData)>250)
     {
         if(visionData>0)
@@ -226,8 +256,8 @@ static void RemoteControlSet()
         // shoot_cmd_send.shoot_data = -100.0f * (float)rc_data[TEMP].rocker_l1; 
         shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_l1; 
         //chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向，位置环
-        chassis_cmd_send.v1 = -15.0f * (float)rocker_r1; // 1竖直方向，速度环
-        gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_l_;//底盘的位置
+        chassis_cmd_send.v1 = -15.0f * (float)rc_data[TEMP].rocker_l_; // 1竖直方向，速度环
+        gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_r_;//底盘的位置rocker_r_rocker_l_
         shoot_cmd_send.rotate_rate += 0.000005f*(float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度
 
         if(rc_data[TEMP].none[0] == 0xc8 && rc_data[TEMP].none[1] != 0xc8 && rc_data[TEMP].none[1] != 0x708)
@@ -252,6 +282,13 @@ static void RemoteControlSet()
             shoot_cmd_send.GripperTest=3;
             // gimbal_cmd_send.yaw = PURPLE_25M_YAW_ANGLE;
         }
+        float current_angle = gimbal_cmd_send.yaw; 
+    
+        // 左限位：小于-550000时，如果视觉想继续往左转（正偏移）
+        if (current_angle < R_POSITION_LIMIT && shoot_cmd_send.shoot_data > 0.0f)
+        {
+        shoot_cmd_send.shoot_data=0.0f;
+        }
         
         #ifdef VIRSION
         gimbal_cmd_send.yaw -= 1.5f * visionData;
@@ -267,7 +304,7 @@ static void RemoteControlSet()
         shoot_cmd_send.rotate_mode = ROTATE_STOP;
         
     }
-    else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_UP || inDartCmd == 1)
+    else if (mc_data_change(rc_data[TEMP].switch_r)==RC_SW_UP && inDartCmd == 1)
     {
         shoot_cmd_send.shoot_mode = SHOOT_AUTO; 
         gimbal_cmd_send.gimbal_mode = AUTO_DART;
@@ -399,18 +436,87 @@ static void RemoteControlSet()
         //自动模式
     }                                       
     #endif
-    // curDartCmd=referee_info->DartCmd.dart_launch_opening_status;
-    // if(curDartCmd == 0 && lastDartCmd != 0)
-    // {
-    //     inDartCmd = 1;
-    // }
-    // if(inDartCmd==1){
-    //     shoot_cmd_send.shoot_mode = SHOOT_AUTO;
-    //     gimbal_cmd_send.gimbal_mode = AUTO_DART;
-    //     chassis_cmd_send.chassis_mode = AUTO_MODE;
-    // }
-    // lastDartCmd=curDartCmd;
+    #ifdef FS_SBUS
+    if (rc_data[TEMP].switch_r1==3) 
+    {
+        // inDartCmd = 0;
+        int16_t rocker_r1 = rc_data[TEMP].rocker_r1;
+        chassis_cmd_send.chassis_mode = CHASSIS_TEST;//CHASSIS_FOLLOW_GIMBAL_YAW;
+        shoot_cmd_send.shoot_mode = SHOOT_TEST;
+        shoot_cmd_send.rotate_mode = ROTATE_TEST;
+        shoot_cmd_send.load_mode = LOADER_TEST;
+        gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
+        // shoot_cmd_send.shoot_data = -100.0f * (float)rc_data[TEMP].rocker_l1; 
+        shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_r1; 
+        //chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向，位置环
+        chassis_cmd_send.v1 = -15.0f * (float)rc_data[TEMP].rocker_l1; // 1竖直方向，速度环
+        gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_r_;//底盘的位置rocker_r_rocker_l_
+        shoot_cmd_send.rotate_rate += 0.000005f*(float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度
+
+        if(rc_data[TEMP].switch_l1 == 1 && rc_data[TEMP].switch_r2 == 1)
+        {
+            shoot_cmd_send.shoot_data = 0;
+        }
+        else if(rc_data[TEMP].switch_l1 == 1 && rc_data[TEMP].switch_r2 == 2)
+        {
+            shoot_cmd_send.GripperTest=1;
+        }
+        else if(rc_data[TEMP].switch_l1 == 2 && rc_data[TEMP].switch_r2 == 1)
+        {
+            shoot_cmd_send.GripperTest=2;
+        }
+        else if(rc_data[TEMP].switch_l1 == 2 && rc_data[TEMP].switch_r2 == 2)
+        {
+            shoot_cmd_send.GripperTest=3;
+        }
+
+        float current_angle = gimbal_cmd_send.yaw; 
+    
+        // 左限位：小于-550000时，如果视觉想继续往左转（正偏移）
+        if (current_angle < R_POSITION_LIMIT && shoot_cmd_send.shoot_data > 0.0f)
+        {
+            shoot_cmd_send.shoot_data=0.0f;
+        }
+        
+        #ifdef VIRSION
+        gimbal_cmd_send.yaw -= 1.5f * visionData;
+        #endif // DEBUG
+    }
+    else if (rc_data[TEMP].switch_r1==2) // 
+    {
+        // inDartCmd = 0;
+        chassis_cmd_send.chassis_mode =CHASSIS_ZERO_FORCE ;
+        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
+        shoot_cmd_send.shoot_mode = SHOOT_OFF;
+        shoot_cmd_send.load_mode = LOAD_STOP;
+        shoot_cmd_send.rotate_mode = ROTATE_STOP;
+        
+    }
+    else if (rc_data[TEMP].switch_r1==1)
+    {
+        autoCount++;
+        shoot_cmd_send.shoot_mode = SHOOT_AUTO; 
+        gimbal_cmd_send.gimbal_mode = AUTO_DART;
+        chassis_cmd_send.chassis_mode = AUTO_MODE;
+        VisionSetFlag(JIDI);
+        #ifdef VIRSION
+            gimbal_cmd_send.yaw -= 1.5f * visionData;
+        #endif // DEBUG
+    }
+
+    //控制扳机
+    if (rc_data[TEMP].switch_l2==1) // 
+    {   
+        shoot_cmd_send.banji_mode = BANJI_ON;
+    }
+    else if (rc_data[TEMP].switch_l2==2)// || vision_recv_data->target_state == NO_TARGET
+    {
+        shoot_cmd_send.banji_mode = BANJI_OFF;
+    }                         
+    #endif
 }
+
+
 static void VisionControl()
 {
     
@@ -485,10 +591,12 @@ void RobotCMDTask()
     SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
     SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
     referee_info = Get_referee_info();
-    RemoteControlSet();   
+    float act_pix_y = YawSoftwareLimit();
+    RemoteControlSet(act_pix_y);   
     EmergencyHandler(); // 处理模块离线和遥控器急停等紧急情况
     VisionSend();
-    shoot_cmd_send.keep_2=vision_recv_data->keep_2;
+    shoot_cmd_send.keep_2 = vision_recv_data->aim_imformation;
+    shoot_cmd_send.err_of_pix = vision_recv_data->err_of_pix;
 #ifdef ONE_BOARD
     PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
 #endif // ONE_BOARD

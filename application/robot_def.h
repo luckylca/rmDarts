@@ -45,8 +45,14 @@
 #define GRIPPER_3_LAY_ANGLE 0.055f // 夹爪放置角度  
 #define GRIPPER_3_NORMAL_ANGLE 0.030f // 夹爪正常角度
 
-#define LF_RELOAD_ANGLE  -24000.0f               //左边换弹位置
-#define RE_RELOAD_ANGLE  24000.0f             //右边换弹位置
+#define LF_RELOAD_ANGLE  -23500.0f               //左边换弹位置
+#define RE_RELOAD_ANGLE  23500.0f             //右边换弹位置
+#define LF_1_RELOAD_ANGLE  -25000.0f               //左边换弹位置
+#define RE_1_RELOAD_ANGLE  25000.0f             //右边换弹位置
+#define LF_2_RELOAD_ANGLE  -24000.0f               //左边换弹位置
+#define RE_2_RELOAD_ANGLE  24000.0f             //右边换弹位置
+#define LF_3_RELOAD_ANGLE  -24300.0f               //左边换弹位置
+#define RE_3_RELOAD_ANGLE  24300.0f             //右边换弹位置
 #define LF_CHASSIS_3508_LOAD_ANGLE -39000.0f // 3508蓄力到位角度；39000
 #define RF_CHASSIS_3508_LOAD_ANGLE 39000.0f // 3508蓄力到位角度；39000
 #define LF_CHASSIS_3508_REBOUND_ANGLE 4400.0f // 3508反弹到位角度 

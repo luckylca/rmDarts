@@ -690,7 +690,7 @@ void setKey2Auto()
 		relay_control(2, 0);
 	}
 	else if (dt < 2000) {
-		ServoSetAngle(gripper2_motor, GRIPPER_2_NORMAL_ANGLE);
+		// ServoSetAngle(gripper2_motor, GRIPPER_2_NORMAL_ANGLE);
 		relay_control(2, 1);
 	}
 	else if (dt < 3500) {
@@ -724,7 +724,7 @@ void setKey3()
 		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);//gripper1_motor
 		relay_control(3, 0);
 	}
-	else if (dt < 1500) {
+	else if (dt < 2000) {
 		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
 		relay_control(3, 1);
 	}
@@ -759,11 +759,11 @@ void setKey3Auto()
 		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
 		relay_control(3, 0);
 	}
-	else if (dt < 1500) {
+	else if (dt < 3000) {
 		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);
 		relay_control(3, 1);
 	}
-	else if (dt < 3500) {
+	else if (dt < 4500) {
 		ServoSetAngle(gripper3_motor, GRIPPER_3_NORMAL_ANGLE);
 		relay_control(3, 1);
 	}
@@ -952,14 +952,16 @@ void ShootTask()
 		DJIMotorEnable(chargeLoader);
 		DMMotorEnable(rotateChageDarts);
 		DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
+		allowed_max_step = 5;
 		// 限制在 allowed_max_step 之外不执行发射流程（用于实现首次只发前两发）
 		if (DartSys.currentStep > allowed_max_step) {
 			break;
 		}
 		int cur = DartSys.currentStep; 
 		VisionSetCur(cur);
-		// if(cur==0)
-		// 	DartSys.currentStep+=1;
+		// ServoSetAngle(gri)
+		if(cur==0)
+			DartSys.currentStep+=1;
 		// #ifdef REFEREE
 		// 	//1是关闭，2 是正在开启，0 是已经开启
 		// if(referee_info->DartCmd.dart_launch_opening_status == 1)

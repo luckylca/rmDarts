@@ -455,7 +455,7 @@ static void RemoteControlSet( float vision_offset)
 
         if(rc_data[TEMP].switch_l1 == 1 && rc_data[TEMP].switch_r2 == 1)
         {
-            shoot_cmd_send.shoot_data = 0;
+            // shoot_cmd_send.shoot_data = 0;
         }
         else if(rc_data[TEMP].switch_l1 == 1 && rc_data[TEMP].switch_r2 == 2)
         {

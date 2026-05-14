@@ -47,6 +47,19 @@ float dead_angle = 2000;
 // extern  RC_ctrl_t *rc_data;
 float loader_err = 0;
 
+float shoot_flag = 0;
+float vision_disconnect_flag = 0;
+
+uint8_t vision_judge_delay_0 =0;
+uint8_t vision_judge_delay_1 =0;
+uint8_t vision_judge_delay_2 =0;
+uint8_t vision_judge_delay_3 =0;
+
+uint32_t time_delay_shoot_0 =0;
+uint32_t time_delay_shoot_1 =0;
+uint32_t time_delay_shoot_2 =0;
+uint32_t time_delay_shoot_3 =0;
+
 // 2006归位标志位
 bool flag_2006_back = false;
 // 2006到达打击目标位置标志位
@@ -720,7 +733,7 @@ void setKey3()
 
 	uint32_t dt = HAL_GetTick() - key3_start_tick;
 
-	if (dt < 1000) {
+	if (dt < 1500) {
 		ServoSetAngle(gripper3_motor, GRIPPER_3_LAY_ANGLE);//gripper1_motor
 		relay_control(3, 0);
 	}
@@ -825,6 +838,8 @@ int start_1_time = 0;
 int start_2_time = 0;
 int start_3_time = 0;
 int tmpb = 0;
+
+float time_delay_shoot = 0;
 extern int i;
 extern int autoCount;
 // 记录上一次模式，用于检测从非 AUTO -> AUTO 的切换
@@ -832,8 +847,13 @@ static int prev_shoot_mode = SHOOT_OFF;
 // 记录进入 AUTO 模式的次数（持续上电期间累积）
 static int auto_enter_count = 0;
 // 允许运行的最大发射步骤（0..3），首次进入 AUTO 只允许前两发（0 和 1）
-static int allowed_max_step = 3;
+int allowed_max_step = 3;
 /* 机器人发射机构控制核心任务 */
+
+static void shoot_delay_pudegt()
+{
+	
+}
 void ShootTask()
 {
 	// 从cmd获取控制数据
@@ -952,7 +972,7 @@ void ShootTask()
 		DJIMotorEnable(chargeLoader);
 		DMMotorEnable(rotateChageDarts);
 		DJIMotorOuterLoop(chargeLoader, ANGLE_LOOP);
-		allowed_max_step = 5;
+		// allowed_max_step = 5;
 		// 限制在 allowed_max_step 之外不执行发射流程（用于实现首次只发前两发）
 		if (DartSys.currentStep > allowed_max_step) {
 			break;
@@ -960,8 +980,8 @@ void ShootTask()
 		int cur = DartSys.currentStep; 
 		VisionSetCur(cur);
 		// ServoSetAngle(gri)
-		if(cur==0)
-			DartSys.currentStep+=1;
+		// if(cur==0)
+		// 	DartSys.currentStep+=3;
 		// #ifdef REFEREE
 		// 	//1是关闭，2 是正在开启，0 是已经开启
 		// if(referee_info->DartCmd.dart_launch_opening_status == 1)
@@ -982,13 +1002,20 @@ void ShootTask()
 					}
 					break;
 				}
+				if(vision_judge_delay_0 == 0 && DART_CHECK_BIT(0, FLAG_READY_TO_SHOOT_WITHOUT_VISION) && !DART_CHECK_BIT(0, FLAG_IN_PLACE))
+				{
+					time_delay_shoot_0 = HAL_GetTick();
+					vision_judge_delay_0 =1;
+				}
 				if (DART_CHECK_MASK(0, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					tmpb=1;
+
 					if(start_0_time == 0) {
 						start_0_time = HAL_GetTick();
 					}
 					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+					shoot_flag = 1;
 					uint32_t dt = HAL_GetTick() - start_0_time;
 					if(dt < 1500) {
 						break; // 延时200ms确保扳机打开
@@ -999,6 +1026,29 @@ void ShootTask()
 					i=0;
 					DartSys.currentStep++;
 				}
+				if( vision_judge_delay_0== 1 && HAL_GetTick() - time_delay_shoot_0 > 3000 && !DART_CHECK_BIT(0, FLAG_FIRED) && !DART_CHECK_BIT(0, FLAG_IN_PLACE) && DART_CHECK_BIT(0, FLAG_READY_TO_SHOOT_WITHOUT_VISION)) {
+					// 扳机打开，发射飞镖
+					tmpb=1;
+
+					if(start_0_time == 0) {
+						start_0_time = HAL_GetTick();
+					}
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+					shoot_flag = 1;
+					uint32_t dt = HAL_GetTick() - start_0_time;
+					if(dt < 1500) {
+						break; // 延时200ms确保扳机打开
+					}
+					tmpb=2;
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
+					DART_SET_BIT(0, FLAG_FIRED);
+					i=0;
+					DartSys.currentStep++;
+					time_delay_shoot_0 = 0;
+					vision_disconnect_flag= 1;
+				}
+
+
 				break;
 			}
 			case 1:
@@ -1013,6 +1063,13 @@ void ShootTask()
 					}
 					break;
 				}
+				//视觉掉线检测
+				if(vision_judge_delay_1 == 0 && DART_CHECK_BIT(1, FLAG_READY_TO_SHOOT_WITHOUT_VISION) && !DART_CHECK_BIT(1, FLAG_IN_PLACE))
+				{
+					time_delay_shoot_1 = HAL_GetTick();
+					vision_judge_delay_1 = 1;
+				}
+
 				if (DART_CHECK_MASK(1, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					if(start_1_time == 0) {
@@ -1031,6 +1088,28 @@ void ShootTask()
 						DartSys.currentStep++;
 					}
 				}
+
+				//视觉掉线，直接开镖
+					if(vision_judge_delay_1 == 1 && HAL_GetTick() - time_delay_shoot_1 > 3000 && !DART_CHECK_BIT(1, FLAG_FIRED) && !DART_CHECK_BIT(1, FLAG_IN_PLACE) && DART_CHECK_BIT(1, FLAG_READY_TO_SHOOT_WITHOUT_VISION)) {
+					// 扳机打开，发射飞镖
+					tmpb=1;
+					if(start_1_time == 0) {
+						start_1_time = HAL_GetTick();
+					}
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+					shoot_flag = 1;
+					uint32_t dt = HAL_GetTick() - start_1_time;
+					if(dt < 1500) {
+						break; // 延时200ms确保扳机打开
+					}
+					tmpb=2;
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
+					DART_SET_BIT(1, FLAG_FIRED);
+					i=0;
+					DartSys.currentStep++;
+					time_delay_shoot_1 = 0;
+					vision_disconnect_flag= 2;
+				}
 				break;
 			}
 			case 2:
@@ -1045,6 +1124,13 @@ void ShootTask()
 					}
 					break;
 				}
+
+				if(vision_judge_delay_2 == 0 && DART_CHECK_BIT(2, FLAG_READY_TO_SHOOT_WITHOUT_VISION) && !DART_CHECK_BIT(2, FLAG_IN_PLACE))
+				{
+					time_delay_shoot_2 = HAL_GetTick();
+					vision_judge_delay_2 = 1;
+				}
+
 				if (DART_CHECK_MASK(2, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					if(start_2_time == 0) {
@@ -1060,6 +1146,29 @@ void ShootTask()
 					i=0;
 					DartSys.currentStep++;
 				}
+
+				    //视觉掉线，直接开镖
+					if(vision_judge_delay_2 == 1 && HAL_GetTick() - time_delay_shoot_2 > 3000 && !DART_CHECK_BIT(2, FLAG_FIRED) && !DART_CHECK_BIT(2, FLAG_IN_PLACE) && DART_CHECK_BIT(2, FLAG_READY_TO_SHOOT_WITHOUT_VISION)) {
+					// 扳机打开，发射飞镖
+					tmpb=1;
+					if(start_2_time == 0) {
+						start_2_time = HAL_GetTick();
+					}
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+					shoot_flag = 1;
+					uint32_t dt = HAL_GetTick() - start_2_time;
+					if(dt < 1500) {
+						break; // 延时200ms确保扳机打开
+					}
+					tmpb=2;
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
+					DART_SET_BIT(2, FLAG_FIRED);
+					i=0;
+					DartSys.currentStep++;
+					time_delay_shoot_2 = 0;
+					vision_disconnect_flag= 3;
+				}
+
 				break;
 			}
 			case 3:
@@ -1074,6 +1183,13 @@ void ShootTask()
 					}
 					break;
 				}
+
+				if(vision_judge_delay_3 == 0 && DART_CHECK_BIT(3, FLAG_READY_TO_SHOOT_WITHOUT_VISION) && !DART_CHECK_BIT(3, FLAG_IN_PLACE))
+				{
+					time_delay_shoot_3 = HAL_GetTick();
+					vision_judge_delay_3 = 1;
+				}
+
 				if (DART_CHECK_MASK(3, MASK_READY_TO_FIRE)) {
 					// 扳机打开，发射飞镖
 					if(start_3_time == 0) {
@@ -1088,6 +1204,28 @@ void ShootTask()
 					DART_SET_BIT(3, FLAG_FIRED);
 					i=0;
 					DartSys.currentStep++;
+				}
+
+				    //视觉掉线，直接开镖
+					if( vision_judge_delay_3 == 1 && HAL_GetTick() - time_delay_shoot_3 > 3000 && !DART_CHECK_BIT(3, FLAG_FIRED) && !DART_CHECK_BIT(3, FLAG_IN_PLACE) && DART_CHECK_BIT(3, FLAG_READY_TO_SHOOT_WITHOUT_VISION)) {
+					// 扳机打开，发射飞镖
+					tmpb=1;
+					if(start_3_time == 0) {
+						start_3_time = HAL_GetTick();
+					}
+					ServoSetAngle(banji_motor, BANJI_OPEN_ANGLE);
+					shoot_flag = 1;
+					uint32_t dt = HAL_GetTick() - start_3_time;
+					if(dt < 1500) {
+						break; // 延时200ms确保扳机打开
+					}
+					tmpb=2;
+					ServoSetAngle(banji_motor, BANJI_CLOSE_ANGLE); // 关闭
+					DART_SET_BIT(3, FLAG_FIRED);
+					i=0;
+					DartSys.currentStep++;
+					time_delay_shoot_3 = 0;
+					vision_disconnect_flag= 4;
 				}
 				break;
 			}

@@ -90,6 +90,7 @@ void GimbalInit()
 
     gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     gimbal_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
+    gimbal_cmd_recv.yaw = -600000; // 先让云台转到左
 }
 
 void GimbalTask()

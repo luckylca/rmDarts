@@ -88,6 +88,11 @@ int flag_3508_max=0;
 //放镖完毕标志位
 int flag_loadok = 0;
 
+int speed = 0;
+
+int flag_1=0;
+int flag_2=0;
+
 extern bool flag_2006_target_ready;
 extern bool flag_2006_back;
 extern goal_of_dart goal;
@@ -103,16 +108,17 @@ extern int key;
 // 速度环位置控制参数：远距离高速，近距离自动降速
 #define CHASSIS_3508_MAX_SPEED_CMD 15000.0f//通过这个控制整体速度，原来是 20000.0f
 #define CHASSIS_3508_MIN_SPEED_CMD 9000.0f
-#define CHASSIS_3508_HOLD_SPEED_CMD 3500.0f
-#define CHASSIS_3508_POS2SPEED_KP 0.75f
+#define CHASSIS_3508_MAX_LOAD_SPEED_CMD 3500.0f
+#define CHASSIS_3508_HOLD_SPEED_CMD 4000.0f
+#define CHASSIS_3508_POS2SPEED_KP 4.5f
 #define CHASSIS_3508_CROSS_DEADBAND 1200.0f
 #define CHASSIS_3508_SLOW_ZONE 2000.0f
-#define CHASSIS_3508_HOLD_DEADBAND 200.0f
+#define CHASSIS_3508_HOLD_DEADBAND 400.0f
 #define CHASSIS_3508_HOLD_RELEASE_DEADBAND 500.0f
-#define CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD 1700.0f   //换弹期间保持速度大小，要换
-#define CHASSIS_3508_LOAD_SPEED_CMD 2600.0f          //蓄力期间保持速度大小
+#define CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD 1800.0f   //换弹期间保持速度大小，要换
+#define CHASSIS_3508_LOAD_SPEED_CMD 3200.0f          //蓄力期间保持速度大小
 
-#define AUTO_ENTRY_LOAD_ACCEPT_ERR 200.0f
+#define AUTO_ENTRY_LOAD_ACCEPT_ERR 400.0f
 #define AUTO_ENTRY_LOAD_ACCEPT_ERR_SECOND 2000.0f
 #define AUTO_ENTRY_LOAD_TIMEOUT_MS 3500.0f
 
@@ -138,7 +144,7 @@ static void ChassisHoldAtLoadWithBias(float L_target, float R_target, float L_fo
     DJIMotorSetRef(motor_rf, hold_ref_r);
 }
 
-
+extern int allowed_max_step;
 
 void ChassisInit()
 {   
@@ -278,8 +284,8 @@ void ChassisTask()
         case CHASSIS_TEST: 
             DJIMotorEnable(motor_lf);
             DJIMotorEnable(motor_rf);
-            //DJIMotorOuterLoop(motor_lf, ANGLE_LOOP);
-            //DJIMotorOuterLoop(motor_rf, ANGLE_LOOP);
+            // DJIMotorOuterLoop(motor_lf, ANGLE_LOOP);
+            // DJIMotorOuterLoop(motor_rf, ANGLE_LOOP);
             DJIMotorOuterLoop(motor_lf, SPEED_LOOP);
             DJIMotorOuterLoop(motor_rf, SPEED_LOOP);
             DJIMotorSetRef(motor_lf, chassis_cmd_recv.v1);
@@ -290,9 +296,14 @@ void ChassisTask()
             DJIMotorEnable(motor_rf);
             DJIMotorOuterLoop(motor_lf, SPEED_LOOP);
             DJIMotorOuterLoop(motor_rf, SPEED_LOOP);
+            // DJIMotorOuterLoop(motor_lf, ANGLE_LOOP);
+            // DJIMotorOuterLoop(motor_rf, ANGLE_LOOP);
             int cur = DartSys.currentStep;
             if (tmpa==1)
                 return;
+            if (DartSys.currentStep > allowed_max_step) {
+                break;
+            }
             switch (cur)
             {
                 case 0:
@@ -327,23 +338,8 @@ void ChassisTask()
                             // 先快速并且匀速往下走：远离目标时直接给最大速度
                             float ref_l = (err_l_load >= 0.0f) ? -CHASSIS_3508_MAX_SPEED_CMD : CHASSIS_3508_MAX_SPEED_CMD;
                             float ref_r = (err_r_load >= 0.0f) ? CHASSIS_3508_MAX_SPEED_CMD : -CHASSIS_3508_MAX_SPEED_CMD;
-                            DJIMotorSetRef(motor_lf, ref_l);
-                            DJIMotorSetRef(motor_rf, ref_r);
+                            
 
-                            // 这里写进入减速区的判断：任一侧进入慢速区，就切换为减速参考
-                            if ((abs_err_l_load < CHASSIS_3508_SLOW_ZONE) || (abs_err_r_load < CHASSIS_3508_SLOW_ZONE))
-                            {
-                                float slow_speed_l = Clampf(abs_err_l_load * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                float slow_speed_r = Clampf(abs_err_r_load * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                DJIMotorSetRef(motor_lf, (err_l_load >= 0.0f) ? -slow_speed_l : slow_speed_l);
-                                DJIMotorSetRef(motor_rf, (err_r_load >= 0.0f) ? slow_speed_r : -slow_speed_r);
-                            }
-
-                            // 这里写到位的判断：双侧都进入到位死区后，先停止并保持在当前位置
                             if (load_reached)
                             {
                                 ChassisHoldAtLoadWithBias(LF_CHASSIS_3508_LOAD_ANGLE,RF_CHASSIS_3508_LOAD_ANGLE,CHASSIS_3508_LOAD_SPEED_CMD,CHASSIS_3508_LOAD_SPEED_CMD);
@@ -354,7 +350,30 @@ void ChassisTask()
                                 {
                                     auto_load_wait_start_ms = DWT_GetTimeline_ms();
                                 }
+                                flag_1=3;
                             }
+                            else if ((abs_err_l_load < CHASSIS_3508_SLOW_ZONE) || (abs_err_r_load < CHASSIS_3508_SLOW_ZONE))
+                            {
+                                float slow_speed_l = Clampf(abs_err_l_load * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_HOLD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                float slow_speed_r = Clampf(abs_err_r_load * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_HOLD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+
+                                speed=slow_speed_l;
+                                DJIMotorSetRef(motor_lf, (err_l_load >= 0.0f) ? -slow_speed_l : slow_speed_l);
+                                DJIMotorSetRef(motor_rf, (err_r_load >= 0.0f) ? slow_speed_r : -slow_speed_r);
+                                flag_1=2;
+                            }
+                            else
+                            {
+                                DJIMotorSetRef(motor_lf, ref_l);
+                                DJIMotorSetRef(motor_rf, ref_r);
+                                flag_1=1;
+                            }
+
+                            // 这里写到位的判断：双侧都进入到位死区后，先停止并保持在当前位置
 
                             break;
                         }
@@ -417,8 +436,8 @@ void ChassisTask()
                             // 3) 到位后保持（给 0 参考）
                             // 4) 满足下一步条件后切到 i=1
                             // ---------------------------
-                            float err_l = LF_RELOAD_ANGLE - motor_lf->measure.total_angle;
-                            float err_r = RE_RELOAD_ANGLE - motor_rf->measure.total_angle;
+                            float err_l = LF_1_RELOAD_ANGLE - motor_lf->measure.total_angle;
+                            float err_r = RE_1_RELOAD_ANGLE - motor_rf->measure.total_angle;
                             float abs_err_l = fabsf(err_l);
                             float abs_err_r = fabsf(err_r);
                             bool load_reached = ((abs_err_l < CHASSIS_3508_HOLD_DEADBAND) && (abs_err_r < CHASSIS_3508_HOLD_DEADBAND)) ||
@@ -426,7 +445,7 @@ void ChassisTask()
 
                             if (auto_reload_wait_start_ms > 0.0f)
                             {
-                                ChassisHoldAtLoadWithBias(LF_RELOAD_ANGLE, RE_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
+                                ChassisHoldAtLoadWithBias(LF_1_RELOAD_ANGLE, RE_1_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
                                 if ((flag_reached==1) && ((DWT_GetTimeline_ms() - auto_reload_wait_start_ms) >= 200.0f))
                                 {
                                     flag_reached=0;
@@ -439,30 +458,35 @@ void ChassisTask()
                             // 先快速并且匀速往下走：远离目标时直接给最大速度
                             float ref_l = (err_l >= 0.0f) ? -CHASSIS_3508_MAX_SPEED_CMD : CHASSIS_3508_MAX_SPEED_CMD;
                             float ref_r = (err_r >= 0.0f) ? CHASSIS_3508_MAX_SPEED_CMD : -CHASSIS_3508_MAX_SPEED_CMD;
-                            DJIMotorSetRef(motor_lf, ref_l);
-                            DJIMotorSetRef(motor_rf, ref_r);
 
-                            // 这里写进入减速区的判断：任一侧进入慢速区，就切换为减速参考
-                            if ((abs_err_l < CHASSIS_3508_SLOW_ZONE) || (abs_err_r < CHASSIS_3508_SLOW_ZONE))
-                            {
-                                float slow_speed_l = Clampf(abs_err_l * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                float slow_speed_r = Clampf(abs_err_r * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                DJIMotorSetRef(motor_lf, (err_l >= 0.0f) ? -slow_speed_l : slow_speed_l);
-                                DJIMotorSetRef(motor_rf, (err_r >= 0.0f) ? slow_speed_r : -slow_speed_r);
-                            }
-
-                            //这里写到位的判断：双侧都进入到位死区后，先停止并保持在当前位置
                             if (load_reached)
                             {
-                                ChassisHoldAtLoadWithBias(LF_RELOAD_ANGLE, RE_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
+                                ChassisHoldAtLoadWithBias(LF_1_RELOAD_ANGLE, RE_1_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
                                 DART_SET_BIT(cur, FLAG_L_BOTTOM_REACHED);
                                 DART_SET_BIT(cur, FLAG_R_BOTTOM_REACHED);
                                 // 记录到位时间，给机构预留稳定时间，避免立刻反向造成冲击
+                                flag_2= 3;
                             }
+                            else if ((abs_err_l < CHASSIS_3508_SLOW_ZONE) || (abs_err_r < CHASSIS_3508_SLOW_ZONE))
+                            {
+                                float slow_speed_l = Clampf(abs_err_l * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_MAX_LOAD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                float slow_speed_r = Clampf(abs_err_r * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_MAX_LOAD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+
+                                speed=slow_speed_l;
+                                DJIMotorSetRef(motor_lf, (err_l >= 0.0f) ? -slow_speed_l : slow_speed_l);
+                                DJIMotorSetRef(motor_rf, (err_r >= 0.0f) ? slow_speed_r : -slow_speed_r);
+                                flag_2=2;
+                            }
+                            else{
+                                DJIMotorSetRef(motor_lf, ref_l);
+                                DJIMotorSetRef(motor_rf, ref_r);
+                                flag_2=1;
+                            }
+
 
                             if(DART_CHECK_MASK(1,MASK_READY_TO_CHASSIS))
                             {
@@ -503,23 +527,8 @@ void ChassisTask()
                             // 先快速并且匀速往下走：远离目标时直接给最大速度
                             float ref_l = (err_l_load >= 0.0f) ? -CHASSIS_3508_MAX_SPEED_CMD : CHASSIS_3508_MAX_SPEED_CMD;
                             float ref_r = (err_r_load >= 0.0f) ? CHASSIS_3508_MAX_SPEED_CMD : -CHASSIS_3508_MAX_SPEED_CMD;
-                            DJIMotorSetRef(motor_lf, ref_l);
-                            DJIMotorSetRef(motor_rf, ref_r);
+                    
 
-                            // 这里写进入减速区的判断：任一侧进入慢速区，就切换为减速参考
-                            if ((abs_err_l_load < CHASSIS_3508_SLOW_ZONE) || (abs_err_r_load < CHASSIS_3508_SLOW_ZONE))
-                            {
-                                float slow_speed_l = Clampf(abs_err_l_load * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                float slow_speed_r = Clampf(abs_err_r_load * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                DJIMotorSetRef(motor_lf, (err_l_load >= 0.0f) ? -slow_speed_l : slow_speed_l);
-                                DJIMotorSetRef(motor_rf, (err_r_load >= 0.0f) ? slow_speed_r : -slow_speed_r);
-                            }
-
-                            // 这里写到位的判断：双侧都进入到位死区后，先停止并保持在当前位置
                             if (load_reached)
                             {
                                 ChassisHoldAtLoadWithBias(LF_CHASSIS_3508_LOAD_ANGLE,RF_CHASSIS_3508_LOAD_ANGLE,CHASSIS_3508_LOAD_SPEED_CMD,CHASSIS_3508_LOAD_SPEED_CMD);
@@ -531,6 +540,22 @@ void ChassisTask()
                                     auto_load_wait_start_ms = DWT_GetTimeline_ms();
                                 }
                             }
+                            else if ((abs_err_l_load < CHASSIS_3508_SLOW_ZONE) || (abs_err_r_load < CHASSIS_3508_SLOW_ZONE))
+                            {
+                                float slow_speed_l = Clampf(abs_err_l_load * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_HOLD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                float slow_speed_r = Clampf(abs_err_r_load * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_HOLD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                DJIMotorSetRef(motor_lf, (err_l_load >= 0.0f) ? -slow_speed_l : slow_speed_l);
+                                DJIMotorSetRef(motor_rf, (err_r_load >= 0.0f) ? slow_speed_r : -slow_speed_r);
+                            }
+                            else{
+                                DJIMotorSetRef(motor_lf, ref_l);
+                                DJIMotorSetRef(motor_rf, ref_r);
+                            }
+                        
 
                             break;
                         }
@@ -581,6 +606,7 @@ void ChassisTask()
                     }
                     break;
                 case 2:
+
                     switch(i)
                     {   
                         case 0:
@@ -593,8 +619,8 @@ void ChassisTask()
                             // 3) 到位后保持（给 0 参考）
                             // 4) 满足下一步条件后切到 i=1
                             // ---------------------------
-                            float err_l = LF_RELOAD_ANGLE - motor_lf->measure.total_angle;
-                            float err_r = RE_RELOAD_ANGLE - motor_rf->measure.total_angle;
+                            float err_l = LF_2_RELOAD_ANGLE - motor_lf->measure.total_angle;
+                            float err_r = RE_2_RELOAD_ANGLE - motor_rf->measure.total_angle;
                             float abs_err_l = fabsf(err_l);
                             float abs_err_r = fabsf(err_r);
                             bool load_reached = ((abs_err_l < CHASSIS_3508_HOLD_DEADBAND) && (abs_err_r < CHASSIS_3508_HOLD_DEADBAND)) ||
@@ -602,7 +628,7 @@ void ChassisTask()
 
                             if (auto_reload_wait_start_ms > 0.0f)
                             {
-                                ChassisHoldAtLoadWithBias(LF_RELOAD_ANGLE, RE_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
+                                ChassisHoldAtLoadWithBias(LF_2_RELOAD_ANGLE, RE_2_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
                                 if (flag_reached==1 && (DWT_GetTimeline_ms() - auto_reload_wait_start_ms) >= 200.0f)
                                 {
                                     flag_reached=0;
@@ -615,29 +641,34 @@ void ChassisTask()
                             // 先快速并且匀速往下走：远离目标时直接给最大速度
                             float ref_l = (err_l >= 0.0f) ? -CHASSIS_3508_MAX_SPEED_CMD : CHASSIS_3508_MAX_SPEED_CMD;
                             float ref_r = (err_r >= 0.0f) ? CHASSIS_3508_MAX_SPEED_CMD : -CHASSIS_3508_MAX_SPEED_CMD;
-                            DJIMotorSetRef(motor_lf, ref_l);
-                            DJIMotorSetRef(motor_rf, ref_r);
+                            
 
-                            // 这里写进入减速区的判断：任一侧进入慢速区，就切换为减速参考
-                            if ((abs_err_l < CHASSIS_3508_SLOW_ZONE) || (abs_err_r < CHASSIS_3508_SLOW_ZONE))
-                            {
-                                float slow_speed_l = Clampf(abs_err_l * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                float slow_speed_r = Clampf(abs_err_r * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                DJIMotorSetRef(motor_lf, (err_l >= 0.0f) ? -slow_speed_l : slow_speed_l);
-                                DJIMotorSetRef(motor_rf, (err_r >= 0.0f) ? slow_speed_r : -slow_speed_r);
-                            }
-
-                            // // 这里写到位的判断：双侧都进入到位死区后，先停止并保持在当前位置
                             if (load_reached)
                             {
-                                ChassisHoldAtLoadWithBias(LF_RELOAD_ANGLE, RE_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
+                                ChassisHoldAtLoadWithBias(LF_2_RELOAD_ANGLE, RE_2_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
                                 DART_SET_BIT(cur, FLAG_L_BOTTOM_REACHED);
                                 DART_SET_BIT(cur, FLAG_R_BOTTOM_REACHED);
                             }
+                            else if ((abs_err_l < CHASSIS_3508_SLOW_ZONE) || (abs_err_r < CHASSIS_3508_SLOW_ZONE))
+                            {
+                                float slow_speed_l = Clampf(abs_err_l * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_MAX_LOAD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                float slow_speed_r = Clampf(abs_err_r * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_MAX_LOAD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                speed = slow_speed_l;
+                                DJIMotorSetRef(motor_lf, (err_l >= 0.0f) ? -slow_speed_l : slow_speed_l);
+                                DJIMotorSetRef(motor_rf, (err_r >= 0.0f) ? slow_speed_r : -slow_speed_r);
+                            }
+                            else
+                            {
+                                DJIMotorSetRef(motor_lf, ref_l);
+                                DJIMotorSetRef(motor_rf, ref_r);
+                            }
+
+                            // // 这里写到位的判断：双侧都进入到位死区后，先停止并保持在当前位置
+                            
                             // 这里写进行下一步动作的判断：到位并稳定 1s 后，切换到 i=1（上行）
                             // if ((auto_reload_wait_start_ms > 0.0f) &&
                             //     ((DWT_GetTimeline_ms() - auto_reload_wait_start_ms) >= 1000.0f))
@@ -677,23 +708,7 @@ void ChassisTask()
                             // 先快速并且匀速往下走：远离目标时直接给最大速度
                             float ref_l = (err_l_load >= 0.0f) ? -CHASSIS_3508_MAX_SPEED_CMD : CHASSIS_3508_MAX_SPEED_CMD;
                             float ref_r = (err_r_load >= 0.0f) ? CHASSIS_3508_MAX_SPEED_CMD : -CHASSIS_3508_MAX_SPEED_CMD;
-                            DJIMotorSetRef(motor_lf, ref_l);
-                            DJIMotorSetRef(motor_rf, ref_r);
 
-                            // 这里写进入减速区的判断：任一侧进入慢速区，就切换为减速参考
-                            if ((abs_err_l_load < CHASSIS_3508_SLOW_ZONE) || (abs_err_r_load < CHASSIS_3508_SLOW_ZONE))
-                            {
-                                float slow_speed_l = Clampf(abs_err_l_load * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                float slow_speed_r = Clampf(abs_err_r_load * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                DJIMotorSetRef(motor_lf, (err_l_load >= 0.0f) ? -slow_speed_l : slow_speed_l);
-                                DJIMotorSetRef(motor_rf, (err_r_load >= 0.0f) ? slow_speed_r : -slow_speed_r);
-                            }
-
-                            // 这里写到位的判断：双侧都进入到位死区后，先停止并保持在当前位置
                             if (load_reached)
                             {
                                 ChassisHoldAtLoadWithBias(LF_CHASSIS_3508_LOAD_ANGLE,RF_CHASSIS_3508_LOAD_ANGLE,CHASSIS_3508_LOAD_SPEED_CMD,CHASSIS_3508_LOAD_SPEED_CMD);
@@ -705,6 +720,22 @@ void ChassisTask()
                                     auto_load_wait_start_ms = DWT_GetTimeline_ms();
                                 }
                             }
+                            else if ((abs_err_l_load < CHASSIS_3508_SLOW_ZONE) || (abs_err_r_load < CHASSIS_3508_SLOW_ZONE))
+                            {
+                                float slow_speed_l = Clampf(abs_err_l_load * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_HOLD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                float slow_speed_r = Clampf(abs_err_r_load * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_HOLD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                DJIMotorSetRef(motor_lf, (err_l_load >= 0.0f) ? -slow_speed_l : slow_speed_l);
+                                DJIMotorSetRef(motor_rf, (err_r_load >= 0.0f) ? slow_speed_r : -slow_speed_r);
+                            }
+                            else{
+                                DJIMotorSetRef(motor_lf, ref_l);
+                                DJIMotorSetRef(motor_rf, ref_r);
+                            }
+                            
 
                             break;
                         }
@@ -767,8 +798,8 @@ void ChassisTask()
                             // 3) 到位后保持（给 0 参考）
                             // 4) 满足下一步条件后切到 i=1
                             // ---------------------------
-                            float err_l = LF_RELOAD_ANGLE - motor_lf->measure.total_angle;
-                            float err_r = RE_RELOAD_ANGLE - motor_rf->measure.total_angle;
+                            float err_l = LF_3_RELOAD_ANGLE - motor_lf->measure.total_angle;
+                            float err_r = RE_3_RELOAD_ANGLE - motor_rf->measure.total_angle;
                             float abs_err_l = fabsf(err_l);
                             float abs_err_r = fabsf(err_r);
                             bool load_reached = ((abs_err_l < CHASSIS_3508_HOLD_DEADBAND) && (abs_err_r < CHASSIS_3508_HOLD_DEADBAND)) ||
@@ -776,7 +807,7 @@ void ChassisTask()
 
                             if (auto_reload_wait_start_ms > 0.0f)
                             {
-                                ChassisHoldAtLoadWithBias(LF_RELOAD_ANGLE, RE_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
+                                ChassisHoldAtLoadWithBias(LF_3_RELOAD_ANGLE, RE_3_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
                                 if (flag_reached==1 && (DWT_GetTimeline_ms() - auto_reload_wait_start_ms) >= 200.0f)
                                 {
                                     flag_reached=0;
@@ -789,29 +820,33 @@ void ChassisTask()
                             // 先快速并且匀速往下走：远离目标时直接给最大速度
                             float ref_l = (err_l >= 0.0f) ? -CHASSIS_3508_MAX_SPEED_CMD : CHASSIS_3508_MAX_SPEED_CMD;
                             float ref_r = (err_r >= 0.0f) ? CHASSIS_3508_MAX_SPEED_CMD : -CHASSIS_3508_MAX_SPEED_CMD;
-                            DJIMotorSetRef(motor_lf, ref_l);
-                            DJIMotorSetRef(motor_rf, ref_r);
 
                             // 这里写进入减速区的判断：任一侧进入慢速区，就切换为减速参考
-                            if ((abs_err_l < CHASSIS_3508_SLOW_ZONE) || (abs_err_r < CHASSIS_3508_SLOW_ZONE))
-                            {
-                                float slow_speed_l = Clampf(abs_err_l * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                float slow_speed_r = Clampf(abs_err_r * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                DJIMotorSetRef(motor_lf, (err_l >= 0.0f) ? -slow_speed_l : slow_speed_l);
-                                DJIMotorSetRef(motor_rf, (err_r >= 0.0f) ? slow_speed_r : -slow_speed_r);
-                            }
-
-                            // 这里写到位的判断：双侧都进入到位死区后，先停止并保持在当前位置
                             if (load_reached)
                             {
-                                ChassisHoldAtLoadWithBias(LF_RELOAD_ANGLE, RE_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
+                                ChassisHoldAtLoadWithBias(LF_3_RELOAD_ANGLE, RE_3_RELOAD_ANGLE,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD,CHASSIS_3508_BOTTOM_HOLD_SPEED_CMD);
                                 DART_SET_BIT(cur, FLAG_L_BOTTOM_REACHED);
                                 DART_SET_BIT(cur, FLAG_R_BOTTOM_REACHED);
                             }
+                            else if ((abs_err_l < CHASSIS_3508_SLOW_ZONE) || (abs_err_r < CHASSIS_3508_SLOW_ZONE))
+                            {
+                                float slow_speed_l = Clampf(abs_err_l * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_MAX_LOAD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                float slow_speed_r = Clampf(abs_err_r * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_MAX_LOAD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                speed = slow_speed_l;
+                                DJIMotorSetRef(motor_lf, (err_l >= 0.0f) ? -slow_speed_l : slow_speed_l);
+                                DJIMotorSetRef(motor_rf, (err_r >= 0.0f) ? slow_speed_r : -slow_speed_r);
+                            }
+                            else
+                            {
+                                DJIMotorSetRef(motor_lf, ref_l);
+                                DJIMotorSetRef(motor_rf, ref_r);
+                            }
+
+                            // 这里写到位的判断：双侧都进入到位死区后，先停止并保持在当前位置
                             // 这里写进行下一步动作的判断：到位并稳定 1s 后，切换到 i=1（上行）
                             // if ((auto_reload_wait_start_ms > 0.0f) &&
                             //     ((DWT_GetTimeline_ms() - auto_reload_wait_start_ms) >= 1000.0f))
@@ -852,23 +887,7 @@ void ChassisTask()
                             // 先快速并且匀速往下走：远离目标时直接给最大速度
                             float ref_l = (err_l_load >= 0.0f) ? -CHASSIS_3508_MAX_SPEED_CMD : CHASSIS_3508_MAX_SPEED_CMD;
                             float ref_r = (err_r_load >= 0.0f) ? CHASSIS_3508_MAX_SPEED_CMD : -CHASSIS_3508_MAX_SPEED_CMD;
-                            DJIMotorSetRef(motor_lf, ref_l);
-                            DJIMotorSetRef(motor_rf, ref_r);
 
-                            // 这里写进入减速区的判断：任一侧进入慢速区，就切换为减速参考
-                            if ((abs_err_l_load < CHASSIS_3508_SLOW_ZONE) || (abs_err_r_load < CHASSIS_3508_SLOW_ZONE))
-                            {
-                                float slow_speed_l = Clampf(abs_err_l_load * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                float slow_speed_r = Clampf(abs_err_r_load * CHASSIS_3508_POS2SPEED_KP,
-                                                            CHASSIS_3508_HOLD_SPEED_CMD,
-                                                            CHASSIS_3508_MIN_SPEED_CMD);
-                                DJIMotorSetRef(motor_lf, (err_l_load >= 0.0f) ? -slow_speed_l : slow_speed_l);
-                                DJIMotorSetRef(motor_rf, (err_r_load >= 0.0f) ? slow_speed_r : -slow_speed_r);
-                            }
-
-                            // 这里写到位的判断：双侧都进入到位死区后，先停止并保持在当前位置
                             if (load_reached)
                             {
                                 ChassisHoldAtLoadWithBias(LF_CHASSIS_3508_LOAD_ANGLE,RF_CHASSIS_3508_LOAD_ANGLE,CHASSIS_3508_LOAD_SPEED_CMD,CHASSIS_3508_LOAD_SPEED_CMD);
@@ -879,6 +898,22 @@ void ChassisTask()
                                 {
                                     auto_load_wait_start_ms = DWT_GetTimeline_ms();
                                 }
+                            }
+                            else if ((abs_err_l_load < CHASSIS_3508_SLOW_ZONE) || (abs_err_r_load < CHASSIS_3508_SLOW_ZONE))
+                            {
+                                float slow_speed_l = Clampf(abs_err_l_load * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_HOLD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                float slow_speed_r = Clampf(abs_err_r_load * CHASSIS_3508_POS2SPEED_KP,
+                                                            CHASSIS_3508_HOLD_SPEED_CMD,
+                                                            CHASSIS_3508_MIN_SPEED_CMD);
+                                DJIMotorSetRef(motor_lf, (err_l_load >= 0.0f) ? -slow_speed_l : slow_speed_l);
+                                DJIMotorSetRef(motor_rf, (err_r_load >= 0.0f) ? slow_speed_r : -slow_speed_r);
+                            }
+                            else
+                            {
+                                DJIMotorSetRef(motor_lf, ref_l);
+                                DJIMotorSetRef(motor_rf, ref_r);
                             }
 
                             break;
@@ -932,6 +967,85 @@ void ChassisTask()
         default:
             break;
         }
+            
+           /*
+            switch (cur) {
+                case 0:
+                    switch(i)
+                    {   
+                        case 0:
+                        {
+                            i=1;
+                            break;
+                        }
+                        case 1:
+                        {
+                            DJIMotorSetRef(motor_lf, RF_CHASSIS_3508_LOAD_ANGLE);
+                            DJIMotorSetRef(motor_rf, RF_CHASSIS_3508_LOAD_ANGLE);
+                            if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, LF_CHASSIS_3508_LOAD_ANGLE, MOTOR_ANGLE_DEADBAND)&&CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, RF_CHASSIS_3508_LOAD_ANGLE, MOTOR_ANGLE_DEADBAND))
+                            {
+                                DART_SET_BIT(cur, FLAG_L_CHARGE_REACHED);
+                                DART_SET_BIT(cur, FLAG_R_CHARGE_REACHED);
+                                i=2;
+                            }
+                        }
+                        case 2:
+                        {
+                            DJIMotorSetRef(motor_lf, LF_CHASSIS_3508_REBOUND_ANGLE);
+                            DJIMotorSetRef(motor_rf, RF_CHASSIS_3508_REBOUND_ANGLE);
+                            if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, LF_CHASSIS_3508_REBOUND_ANGLE, MOTOR_ANGLE_DEADBAND)&&CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, RF_CHASSIS_3508_REBOUND_ANGLE, MOTOR_ANGLE_DEADBAND))
+                            {
+                                DART_SET_BIT(cur, FLAG_L_REBOUND_REACHED);
+                                DART_SET_BIT(cur, FLAG_R_REBOUND_REACHED);
+                                i=0;
+                            }
+                        }
+                        default:
+                            break;
+                    }
+                case 1:
+                    switch (i)
+                    {
+                    case 0:
+                        DJIMotorSetRef(motor_lf,RE_1_RELOAD_ANGLE);
+                        DJIMotorSetRef(motor_rf,RE_1_RELOAD_ANGLE);
+                        if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, RE_1_RELOAD_ANGLE, MOTOR_ANGLE_DEADBAND)&&CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, RE_1_RELOAD_ANGLE, MOTOR_ANGLE_DEADBAND))
+                        {
+                            DART_SET_BIT(cur, FLAG_L_BOTTOM_REACHED);
+                            DART_SET_BIT(cur, FLAG_R_BOTTOM_REACHED);
+                            if(DART_CHECK_MASK(1,MASK_READY_TO_CHASSIS))
+                                i=1;
+                        }
+                        break;
+                    case 1:
+                        DJIMotorSetRef(motor_lf, RF_CHASSIS_3508_LOAD_ANGLE);
+                        DJIMotorSetRef(motor_rf, RF_CHASSIS_3508_LOAD_ANGLE);
+                        if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, LF_CHASSIS_3508_LOAD_ANGLE, MOTOR_ANGLE_DEADBAND)&&CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, RF_CHASSIS_3508_LOAD_ANGLE, MOTOR_ANGLE_DEADBAND))
+                        {
+                            DART_SET_BIT(cur, FLAG_L_CHARGE_REACHED);
+                            DART_SET_BIT(cur, FLAG_R_CHARGE_REACHED);
+                            i=2;
+                        }
+                        break;
+                    case 2:
+                        DJIMotorSetRef(motor_lf, LF_CHASSIS_3508_REBOUND_ANGLE);
+                        DJIMotorSetRef(motor_rf, RF_CHASSIS_3508_REBOUND_ANGLE);
+                        if(CHECK_ANGLE_ARRIVED(motor_lf->measure.total_angle, LF_CHASSIS_3508_REBOUND_ANGLE, MOTOR_ANGLE_DEADBAND)&&CHECK_ANGLE_ARRIVED(motor_rf->measure.total_angle, RF_CHASSIS_3508_REBOUND_ANGLE, MOTOR_ANGLE_DEADBAND))
+                        {
+                            DART_SET_BIT(cur, FLAG_L_REBOUND_REACHED);
+                            DART_SET_BIT(cur, FLAG_R_REBOUND_REACHED);
+                            i=0;
+                        }
+                        break;
+                    default:
+                        break;
+                    }
+
+
+
+
+            }
+            */
     }
 
     #ifdef ONE_BOARD

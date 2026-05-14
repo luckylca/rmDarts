@@ -46,6 +46,7 @@
                             FLAG_DART_DROPPED | \
                             FLAG_IN_PLACE)//准备发射标志位
 
+#define FLAG_READY_TO_SHOOT_WITHOUT_VISION (FLAG_L_REBOUND_REACHED | FLAG_R_REBOUND_REACHED)                            
 // ==========================================
 // 3. 数据结构与宏
 // ==========================================

@@ -173,7 +173,7 @@ void RobotCMDInit()
     cmd_can_comm = CANCommInit(&comm_conf);
 #endif // GIMBAL_BOARD
     gimbal_cmd_send.bottom = 0;
-    gimbal_cmd_send.yaw = 0;
+    gimbal_cmd_send.yaw = -790000; // 上电默认朝左
     robot_state = ROBOT_READY; // 启动时机器人进入工作模式,后续加入所有应用初始化完成之后再进入
 }
 
@@ -448,7 +448,7 @@ static void RemoteControlSet( float vision_offset)
         gimbal_cmd_send.gimbal_mode = GIMBAL_TEST;
         // shoot_cmd_send.shoot_data = -100.0f * (float)rc_data[TEMP].rocker_l1; 
         shoot_cmd_send.shoot_data -= 0.8f * (float)rc_data[TEMP].rocker_r1; 
-        //chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向，位置环
+        // chassis_cmd_send.v1 -= 0.1f * (float)rc_data[TEMP].rocker_r1; // 1竖直方向，位置环
         chassis_cmd_send.v1 = -15.0f * (float)rc_data[TEMP].rocker_l1; // 1竖直方向，速度环
         gimbal_cmd_send.yaw += 0.5f * (float)rc_data[TEMP].rocker_r_;//底盘的位置rocker_r_rocker_l_
         shoot_cmd_send.rotate_rate += 0.000005f*(float)rc_data[TEMP].rocker_r_; // 右水平,换弹旋转的速度

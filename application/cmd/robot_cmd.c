@@ -173,7 +173,7 @@ void RobotCMDInit()
     cmd_can_comm = CANCommInit(&comm_conf);
 #endif // GIMBAL_BOARD
     gimbal_cmd_send.bottom = 0;
-    gimbal_cmd_send.yaw = -790000; // 上电默认朝左
+    gimbal_cmd_send.yaw = -411700; // 上电默认朝左
     robot_state = ROBOT_READY; // 启动时机器人进入工作模式,后续加入所有应用初始化完成之后再进入
 }
 

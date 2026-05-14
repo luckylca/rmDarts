@@ -36,7 +36,7 @@
 /* 机器人重要参数定义,注意根据不同机器人进行修改,浮点数需要以.0或f结尾,无符号以u结尾 */
 
 #define BANJI_OPEN_ANGLE 0.098f    // 扳机舵机打开角度
-#define BANJI_CLOSE_ANGLE 0.081f // 扳机舵机关闭角度
+#define BANJI_CLOSE_ANGLE 0.082f // 扳机舵机关闭角度
 #define GRIPPER_CLOSE_ANGLE 0.000f // 扳机舵机发射角度
 #define GRIPPER_1_LAY_ANGLE 0.111f // 夹爪放置角度
 #define GRIPPER_1_NORMAL_ANGLE 0.075f // 夹爪正常角度
@@ -47,16 +47,16 @@
 
 #define LF_RELOAD_ANGLE  -24500.0f               //左边换弹位置
 #define RE_RELOAD_ANGLE  24500.0f             //右边换弹位置
-#define LF_1_RELOAD_ANGLE  -22000.0f               //左边换弹位置
-#define RE_1_RELOAD_ANGLE  22000.0f             //右边换弹位置
-#define LF_2_RELOAD_ANGLE  -22500.0f               //左边换弹位置
-#define RE_2_RELOAD_ANGLE  22500.0f             //右边换弹位置
-#define LF_3_RELOAD_ANGLE  -22000.0f               //左边换弹位置
-#define RE_3_RELOAD_ANGLE  22000.0f             //右边换弹位置
+#define LF_1_RELOAD_ANGLE  -24000.0f               //左边换弹位置
+#define RE_1_RELOAD_ANGLE  24000.0f             //右边换弹位置
+#define LF_2_RELOAD_ANGLE  -24500.0f               //左边换弹位置
+#define RE_2_RELOAD_ANGLE  24500.0f             //右边换弹位置
+#define LF_3_RELOAD_ANGLE  -24000.0f               //左边换弹位置
+#define RE_3_RELOAD_ANGLE  24000.0f             //右边换弹位置
 #define LF_CHASSIS_3508_LOAD_ANGLE -38000.0f // 3508蓄力到位角度；39000
 #define RF_CHASSIS_3508_LOAD_ANGLE 38000.0f // 3508蓄力到位角度；39000
-#define LF_CHASSIS_3508_REBOUND_ANGLE 5000.0f // 3508反弹到位角度 
-#define RF_CHASSIS_3508_REBOUND_ANGLE -5000.0f // 3508反弹到位角度
+#define LF_CHASSIS_3508_REBOUND_ANGLE 3000.0f // 3508反弹到位角度 
+#define RF_CHASSIS_3508_REBOUND_ANGLE -3000.0f // 3508反弹到位角度
 
 #define RELOAD_TRIGGER_POS 20000.0f
 #define RELOAD_TRIGGER_DEADBAND 100.0f
@@ -74,7 +74,7 @@
 // #define BLUE_25M_SHOOT_ANGLE -385246.7f //  蓝色25m发射位置
 // #define PURPLE_25M_SHOOT_ANGLE -385246.7f // 紫色25m发射位置
 
-#define YELLOW_25M_SHOOT_ANGLE 82777.0f // 黄色25m发射位置;-115000.7f；-539260.0f
+#define YELLOW_25M_SHOOT_ANGLE 83777.0f // 黄色25m发射位置;-115000.7f；-539260.0f
 #define GREEN_25M_SHOOT_ANGLE 83777.0f //  绿色25m发射位置;-105000.7f；-.344f
 #define BLUE_25M_SHOOT_ANGLE 84777.0f //  蓝色25m发射位置;-95000.7f；110745.789f
 #define PURPLE_25M_SHOOT_ANGLE 85777.0f // 紫色25m发射位置;-85000.7f；
